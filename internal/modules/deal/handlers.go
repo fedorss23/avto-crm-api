@@ -3,7 +3,9 @@ package deal
 import (
 	"avto-crm-api/internal/utils"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,6 +18,40 @@ func NewDealHandler(service *DealService) *DealHandler {
 	return &DealHandler{
 		service: service,
 	}
+}
+
+func (h *DealHandler) FindAll(c *gin.Context) {
+	page, exists := c.GetQuery("page")
+	if !exists {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Ошибка при получении сделок: пропущен query-параметер page", errors.New("Error with query param: page"))
+		return
+	}
+
+	limit, exists := c.GetQuery("limit")
+	if !exists {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Ошибка при получении сделок: пропущен query-параметер limit", errors.New("Error with query param: limit"))
+		return
+	}
+
+	intPage, err := strconv.Atoi(page)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Ошибка при получении сделок: параметр page должен быть int", errors.New("Query param page must be a int"))
+		return
+	}
+
+	intLimit, err := strconv.Atoi(limit)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Ошибка при получении сделок: параметр page должен быть int", errors.New("Query param page must be a int"))
+		return
+	}
+
+	deals, total, err := h.service.FindAll(intPage, intLimit)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Не удалось получить все сделки", err)
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("Успешное получение данных: %d", total), deals)
 }
 
 func (h *DealHandler) CreateFullDeal(c *gin.Context) {
@@ -31,7 +67,7 @@ func (h *DealHandler) CreateFullDeal(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponseWithoutBody(c, http.StatusCreated, "deal successfully created",)
+	utils.SuccessResponseWithoutBody(c, http.StatusCreated, "deal successfully created")
 }
 
 func (h *DealHandler) Update(c *gin.Context) {
@@ -58,7 +94,7 @@ func (h *DealHandler) FindDealByOwnerId(c *gin.Context) {
 	}
 
 	deals, total, err := h.service.FindDealByOwnerId(id)
-	
+
 	resp := DealsResponse{
 		Deals: deals,
 		Total: total,
@@ -74,7 +110,7 @@ func (h *DealHandler) FindDealByOwnerId(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusOK, "deals successfully found", resp)	
+	utils.SuccessResponse(c, http.StatusOK, "deals successfully found", resp)
 }
 
 func (h *DealHandler) FindDealByClientId(c *gin.Context) {
@@ -85,7 +121,7 @@ func (h *DealHandler) FindDealByClientId(c *gin.Context) {
 	}
 
 	deals, total, err := h.service.FindDealByClientId(id)
-	
+
 	resp := DealsResponse{
 		Deals: deals,
 		Total: total,
@@ -101,5 +137,5 @@ func (h *DealHandler) FindDealByClientId(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusOK, "deals successfully found", resp)	
+	utils.SuccessResponse(c, http.StatusOK, "deals successfully found", resp)
 }

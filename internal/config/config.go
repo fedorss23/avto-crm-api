@@ -16,7 +16,7 @@ type Config struct {
 	DBUser string
 	DBHost string
 	DBPort int
-	ServerPort int
+	ServerPort string
 	Domain string
 	Issuer string
 	DBMaxOpenConns    int
@@ -36,7 +36,6 @@ func LoadConfig() *Config {
 	version := getEnv("version", "dev")
 
 	dbport, _ := strconv.Atoi(getEnv("DB_PORT", "5432"))
-	serverport, _ := strconv.Atoi(getEnv("SERVER_PORT", "8080"))
 	dbmax, _ := strconv.Atoi(getEnv("DB_MAX_OPEN_CONNS", "10"))
 	maxIdle, _ := strconv.Atoi(getEnv("DB_MAX_IDLE_LIFETIME", "10"))
 	lifetime, _ := time.ParseDuration(getEnv("DB_CONN_MAX_LIFETIME", "5m"))
@@ -47,7 +46,7 @@ func LoadConfig() *Config {
 		DBUser: getEnv("DB_USER", "postgres"),
 		DBPort: dbport,
 		DBHost: getEnv("DB_HOST", "localhost"),
-		ServerPort: serverport,
+		ServerPort: getEnv("SERVER_PORT", "8080"),
 		DBMaxOpenConns: dbmax,
 		DBMaxIdleConns: maxIdle,
 		DBConnMaxLifetime: lifetime,

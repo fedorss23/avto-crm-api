@@ -8,7 +8,7 @@ import (
 )
 
 type Stage struct {
-	ID   uuid.UUID `gorm:"primaryKey;type:uuid;default:get_random_uuid()" json:"id"`
+	ID   uuid.UUID `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	Name string    `gorm:"not null" json:"name"`
 
 	PipelineID uuid.UUID `json:"pipelineId"`

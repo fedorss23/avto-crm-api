@@ -6,16 +6,15 @@ import (
 	"avto-crm-api/internal/modules/deal"
 	"avto-crm-api/internal/modules/pipeline"
 	"avto-crm-api/internal/modules/stage"
+	"avto-crm-api/internal/modules/user"
 	"fmt"
 	"log"
-	"os/user"
 	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
-
 
 func Connect(cfg *config.Config) (*gorm.DB, error) {
 	gormConfig := &gorm.Config{
@@ -38,10 +37,15 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 	}
 
 	sqlDB.SetMaxOpenConns(cfg.DBMaxOpenConns)
-    sqlDB.SetMaxIdleConns(cfg.DBMaxIdleConns)
-    sqlDB.SetConnMaxLifetime(cfg.DBConnMaxLifetime)
+	sqlDB.SetMaxIdleConns(cfg.DBMaxIdleConns)
+	sqlDB.SetConnMaxLifetime(cfg.DBConnMaxLifetime)
 
 	log.Println("Соединение с базой данных установлено")
+
+	if err := AutoMigrate(db); err != nil {
+		return nil, fmt.Errorf("Ошибка с миграциями")
+	}
+
 	return db, nil
 }
 
@@ -49,11 +53,11 @@ func AutoMigrate(db *gorm.DB) error {
 	log.Println("Запуск миграций")
 
 	err := db.AutoMigrate(
-		&deal.Deal{},
-		&pipeline.Pipeline{},
-		&stage.Stage{},
 		&user.User{},
+		&pipeline.Pipeline{},
 		&car.Car{},
+		&stage.Stage{},
+		&deal.Deal{},
 	)
 
 	if err != nil {

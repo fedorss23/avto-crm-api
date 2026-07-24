@@ -15,7 +15,7 @@ type Deal struct {
 	PipelineID *uuid.UUID `json:"pipelineId"`
 	Pipeline   *pipeline.Pipeline
 
-	CurrentStage *uuid.UUID
+	CurrentStage *uuid.UUID `json:"currentStage"`
 
 	CarID *uuid.UUID `json:"carId"`
 

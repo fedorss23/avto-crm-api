@@ -79,10 +79,13 @@ func main() {
 
 		deal := api.Group("/deal")
 		{
+			deal.GET("/", dealHandler.FindAll)
 			deal.GET("/by-owner/:userId", dealHandler.FindDealByOwnerId)
 			deal.GET("/by-client/:userId", dealHandler.FindDealByClientId)
 			deal.POST("/", dealHandler.CreateFullDeal)
 			deal.PUT("/", dealHandler.Update)
 		}
 	}
+
+	router.Run(":" + cfg.ServerPort)
 }

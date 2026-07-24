@@ -21,6 +21,10 @@ func NewDealService(db *gorm.DB, dealRepo *DealRepository) *DealService {
 	}
 }
 
+func (s *DealService) FindAll(page, limit int) ([]Deal, int64, error) {
+	return s.dealRepo.FindList(s.db, page, limit)
+}
+
 func (s *DealService) CreateFullDeal(req *CreateDealRequest) (error) {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		pipeline := &pipeline.Pipeline{
