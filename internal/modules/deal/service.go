@@ -45,7 +45,9 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 			Destination: req.Pipeline.Destination,
 		}
 
-		var firstStageID uuid.UUID
+		if err := s.pipeRepo.Create(tx, pipeline); err != nil {
+			return err
+		}
 
 		car := &car.Car{
 			Model: req.Car.Model,
@@ -61,13 +63,14 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 			Name:         req.Name,
 			Pipeline:     pipeline,
 			OwnerID:      oid,
-			CurrentStage: &firstStageID,
 			Car:          car,
 		}
 
 		if err := s.dealRepo.Create(tx, deal); err != nil {
 			return err
 		}
+
+		var firstStageID uuid.UUID
 
 		for index, i := range req.Pipeline.Stages {
 			stage := stage.Stage{
@@ -87,6 +90,12 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 				firstStageID = stage.ID
 			}
  		}
+
+		deal.CurrentStage = &firstStageID
+
+		if err := s.dealRepo.Update(tx, deal); err != nil {
+			return err
+		}
 
 		return nil
 	})
