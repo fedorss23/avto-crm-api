@@ -1,0 +1,59 @@
+{
+	"id": "ba121f81-b362-46fb-8f19-dad29f4d72c7",
+	"name": "huiall",
+	"status": "active",
+	"pipeline": {
+		"name": "first",
+		"source": "korea",
+		"destination": "chelyare",
+		"stages": [
+			{
+    		"name": "first stage",
+    		"description": "stage"
+   		},
+   		{
+      	"name": "second stage",
+      	"description": "stage"
+   		}
+		],
+		"dealId": "ba121f81-b362-46fb-8f19-dad29f4d72c7"
+	},
+	"currentStage": null,
+	"car": null,
+	"ownerId": "22a872fa-d054-4b5b-a1d8-9d3a9ffd82ac",
+	"createdAt": "2026-07-22T13:30:24.087128+03:00",
+	"updatedAt": "2026-07-22T13:30:24.087128+03:00"
+}
+
+
+http://localhost:8080/api/v1/deal/ba121f81-b362-46fb-8f19-dad29f4d72c7/next-stage
+
+
+{
+	"name": "huiall",
+	"status": "active",
+	"pipeline": {
+		"name": "first",
+		"source": "korea",
+		"destination": "chelyare",
+		"stages": [
+			{
+    		"name": "first stage",
+    		"description": "stage"
+   		},
+   		{
+      	"name": "second stage",
+      	"description": "stage"
+   		}
+		]
+	},
+	"car": {
+		"model": "BMW"
+	}
+}
+
+
+27c571b3-378a-4d07-bc7a-7a5aa9aa014c
+
+
+http://localhost:8080/api/v1/deal/by-id/808ad1fd-6d30-40c2-a5a3-4b00804096c1?isFull=true

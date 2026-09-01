@@ -99,7 +99,6 @@ func (s *AuthService) Login(req *LoginRequest, ip string) (*LoginResult, error) 
 	// обновление последнего входа
 	// now := time.Now()
 	// user.LastLogin := &now
-	s.userRepo.Update(user)
 
 	tokenResponse, err := s.generateTokens(user)
 

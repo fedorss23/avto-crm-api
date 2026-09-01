@@ -24,6 +24,7 @@ type Config struct {
 	DBConnMaxLifetime time.Duration
 	Secure bool
 	JWTSecret string
+	Version string
 }
 
 func LoadConfig() *Config {
@@ -51,6 +52,7 @@ func LoadConfig() *Config {
 		DBMaxIdleConns: maxIdle,
 		DBConnMaxLifetime: lifetime,
 		JWTSecret: getEnv("SECRET", "pass@w0rd"),
+		Version: version,
 	}
 
 	switch version {

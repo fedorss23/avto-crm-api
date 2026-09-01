@@ -4,10 +4,13 @@ import (
 	"avto-crm-api/internal/config"
 	"avto-crm-api/internal/database"
 	"avto-crm-api/internal/modules/auth"
+	"avto-crm-api/internal/modules/car"
+	"avto-crm-api/internal/modules/client"
 	"avto-crm-api/internal/modules/deal"
 	"avto-crm-api/internal/modules/user"
 	"avto-crm-api/pkg/cookie"
 	"avto-crm-api/pkg/jwt"
+	"avto-crm-api/pkg/middleware"
 	"log"
 	"time"
 
@@ -17,7 +20,18 @@ import (
 func main() {
 	cfg := config.LoadConfig()
 
-	jwtMaker := jwt.NewJWTMaker(cfg.JWTSecret, cfg.Issuer)
+	serviceConfig := &auth.Config{
+		AccessTokenDuration:  15 * time.Minute,
+		RefreshTokenDuration: 7 * 24 * time.Hour,
+		MaxLoginAttempts:     5,
+		LockDuration:         10 * time.Minute,
+	}
+
+	if cfg.Version == "dev" {
+		serviceConfig.AccessTokenDuration = 60 * 24 * time.Minute
+	}
+
+	jwtMaker := jwt.NewJWTMaker(cfg.JWTSecret, cfg.Issuer, serviceConfig.AccessTokenDuration, serviceConfig.RefreshTokenDuration)
 
 	log.Println("Connecting to database")
 
@@ -29,30 +43,29 @@ func main() {
 
 	userRepo := user.NewUserRepository(db)
 	dealRepo := deal.NewDealRepository(db)
+	carRepo := car.NewCarRepository(db)
+	clientRepo := client.NewClientRepository(db)
 	// stageRepo := stage.NewStageRepository()
 	// pipelineRepo := pipeline.NewPipelineRepository()
 
-	serviceConfig := &auth.Config{
-		AccessTokenDuration:  15 * time.Minute,
-		RefreshTokenDuration: 7 * 24 * time.Hour,
-		MaxLoginAttempts:     5,
-		LockDuration:         10 * time.Minute,
-	}
 
 	authService := auth.NewAuthService(userRepo, jwtMaker, serviceConfig)
-	dealService := deal.NewDealService(db, dealRepo)
-
+	dealService := deal.NewDealService(db, dealRepo, carRepo)
+	carService := car.NewCarService(carRepo)
+	clientSerivce := client.NewClientService(clientRepo)
 
 	cookieConfig := cookie.NewCookieConfig(cfg.Domain, cfg.Secure)
 
 	authHandler := auth.NewAuthHandler(authService, cookieConfig)
 	dealHandler := deal.NewDealHandler(dealService)
+	carHandler := car.NewCarHandler(carService)
+	clientHandler := client.NewClientHandler(clientSerivce)
 
 	router := gin.Default()
 
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
-	
+
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status":  "OK",
@@ -70,20 +83,38 @@ func main() {
 			auth.GET("/check/:userId", authHandler.CheckAuth)
 			auth.POST("/refresh-tokens", authHandler.Refresh)
 
+			aauth := auth.Group("")
+			aauth.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 			{
-				auth.GET("/profile/:userId", authHandler.GetProfile)
-				auth.POST("/change-password/:userId", authHandler.ChangePassword)
-				auth.POST("/logout/:userId", authHandler.Logout)
+				aauth.GET("/profile/", authHandler.GetProfile)
+				aauth.POST("/change-password/", authHandler.ChangePassword)
+				aauth.POST("/logout/", authHandler.Logout)
 			}
 		}
 
 		deal := api.Group("/deal")
 		{
+			deal.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+
 			deal.GET("/", dealHandler.FindAll)
-			deal.GET("/by-owner/:userId", dealHandler.FindDealByOwnerId)
-			deal.GET("/by-client/:userId", dealHandler.FindDealByClientId)
+			deal.GET("/by-owner/", dealHandler.FindDealByOwnerId)
+			deal.GET("/by-client/:clientId", dealHandler.FindDealByClientId)
 			deal.POST("/", dealHandler.CreateFullDeal)
 			deal.PUT("/", dealHandler.Update)
+			deal.POST("/:dealId/next-stage", dealHandler.SetNextStage)
+			deal.DELETE("/:dealId", dealHandler.Delete)
+			deal.GET("/by-id/:dealId", dealHandler.FindById)
+		}
+
+		car := api.Group("/car")
+		{
+			car.GET("/", carHandler.FindAll)
+			car.POST("/", carHandler.Create)
+		}
+
+		client := api.Group("/client")
+		{
+			client.GET("/", clientHandler.FindById)
 		}
 	}
 

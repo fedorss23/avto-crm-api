@@ -3,6 +3,7 @@ package database
 import (
 	"avto-crm-api/internal/config"
 	"avto-crm-api/internal/modules/car"
+	"avto-crm-api/internal/modules/client"
 	"avto-crm-api/internal/modules/deal"
 	"avto-crm-api/internal/modules/pipeline"
 	"avto-crm-api/internal/modules/stage"
@@ -57,6 +58,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&pipeline.Pipeline{},
 		&car.Car{},
 		&stage.Stage{},
+		&client.Client{},
 		&deal.Deal{},
 	)
 

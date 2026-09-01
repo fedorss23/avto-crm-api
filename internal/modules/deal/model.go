@@ -1,6 +1,7 @@
 package deal
 
 import (
+	"avto-crm-api/internal/modules/car"
 	"avto-crm-api/internal/modules/pipeline"
 	"time"
 
@@ -11,16 +12,15 @@ import (
 type Deal struct {
 	ID   uuid.UUID `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	Name string    `gorm:"" json:"name"`
+	Status string `gorm:"default:'active'" json:"status"`
 
-	PipelineID *uuid.UUID `json:"pipelineId"`
-	Pipeline   *pipeline.Pipeline
+	Pipeline   *pipeline.Pipeline `json:"pipeline"`
 
 	CurrentStage *uuid.UUID `json:"currentStage"`
 
-	CarID *uuid.UUID `json:"carId"`
+	Car *car.Car `json:"car"`
 
 	OwnerID  uuid.UUID `json:"ownerId"`
-	ClientID *uuid.UUID `json:"clientId"`
 
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"updatedAt"`

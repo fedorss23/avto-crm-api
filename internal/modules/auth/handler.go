@@ -25,7 +25,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "неправильный запрос", err)
+		errs := utils.ParseValidationErrors(err)
+		utils.ValidationErrorResponse(c, errs)
 		return
 	}
 
@@ -54,7 +55,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "неправильный запрос", err)
+		errs := utils.ParseValidationErrors(err)
+		utils.ValidationErrorResponse(c, errs)
 		return
 	}
 
@@ -125,9 +127,9 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 }
 
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
-	userID := c.Param("userId")
+	userId, exists := c.Get("userId")
 
-	if userID == "" {
+	if !exists {
 		utils.ErrorResponse(c, http.StatusForbidden, "пользователь не авторизован", errors.New("wrong get userId as query param"))
 		return
 	}
@@ -135,11 +137,12 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	var req ChangePasswordRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "неправильный запрос", err)
+		errs := utils.ParseValidationErrors(err)
+		utils.ValidationErrorResponse(c, errs)
 		return
 	}
 
-	if err := h.service.ChangePassword(userID, &req); err != nil {
+	if err := h.service.ChangePassword(userId.(string), &req); err != nil {
 		if err == ErrOldPasswordIncorrect {
 			utils.ErrorResponse(c, http.StatusBadRequest, "неправильный пароль", err)
 			return
@@ -156,14 +159,14 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 
 func (h *AuthHandler) GetProfile(c *gin.Context) {
-	userID := c.Param("userId")
+	userId := c.GetString("userId")
 
-	if userID == "" {
+	if userId == "" {
 		utils.ErrorResponse(c, http.StatusForbidden, "пользователь не авторизован", errors.New("wrong get userId as query param"))
 		return
 	}
 
-	user, err := h.service.GetProfile(userID)
+	user, err := h.service.GetProfile(userId)
 
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusNotFound, "пользователь не найден", err)
@@ -174,14 +177,14 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 }
 
 func (h *AuthHandler) CheckAuth(c *gin.Context) {
-	userID := c.Param("userId")
+	userId, exists := c.Get("userId")
 
-	if userID == "" {
+	if !exists {
 		utils.ErrorResponse(c, http.StatusForbidden, "пользователь не авторизован", errors.New("wrong get userId as query param"))
 		return
 	}
 
-	user, err := h.service.GetProfile(userID)
+	user, err := h.service.GetProfile(userId.(string))
 
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusUnauthorized, "пользователь не авторизован", err)

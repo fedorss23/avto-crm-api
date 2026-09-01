@@ -10,6 +10,8 @@ import (
 type JWTMaker struct {
 	secret []byte
 	issuer string
+	accessTokenDuration time.Duration
+	refreshTokenDuration time.Duration
 }
 
 type AccessTokenClaims struct {
@@ -29,10 +31,12 @@ type PasswordResetClaims struct {
 	jwt.RegisteredClaims
 }
 
-func NewJWTMaker(secret string, issuer string) *JWTMaker {
+func NewJWTMaker(secret string, issuer string, accessTokenDuration time.Duration, refreshTokenDuration time.Duration) *JWTMaker {
 	return &JWTMaker{
 		secret: []byte(secret),
 		issuer: issuer,
+		accessTokenDuration: accessTokenDuration,
+		refreshTokenDuration: refreshTokenDuration,
 	}
 }
 
@@ -45,7 +49,7 @@ func (m *JWTMaker) CreateAccessToken(userID, email string) (string, error) {
 			Issuer: m.issuer,
 			Subject: userID,
 			IssuedAt: jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(m.accessTokenDuration)),
 			NotBefore: jwt.NewNumericDate(now),
 		},
 	}
@@ -62,7 +66,7 @@ func (m *JWTMaker) CreateRefreshToken(userID string) (string, error) {
 			Issuer: m.issuer,
 			Subject: userID,
 			IssuedAt: jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(24 * 7 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(m.refreshTokenDuration)),
 			NotBefore: jwt.NewNumericDate(now),
 		},	
 	}
@@ -91,7 +95,7 @@ func (m *JWTMaker) CreatePassowrdResestToken(userID string) (string, error) {
 func (m *JWTMaker) ValidateAccessToken(tokenString string) (*AccessTokenClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &AccessTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Неподдерживаемый метод: %v", token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return m.secret, nil
 	})
@@ -104,13 +108,13 @@ func (m *JWTMaker) ValidateAccessToken(tokenString string) (*AccessTokenClaims, 
 		return claims, nil
 	}
 
-	return nil, fmt.Errorf("Инвалид токен")
+	return nil, fmt.Errorf("invalid token")
 }
 
 func (m *JWTMaker) ValidateRefreshToken(tokenString string) (*RefreshTokenClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &RefreshTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Неподдерживаемый метод: %v", token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 
 		return m.secret, nil
@@ -124,7 +128,7 @@ func (m *JWTMaker) ValidateRefreshToken(tokenString string) (*RefreshTokenClaims
 		return claims, nil
 	}
 
-	return nil, fmt.Errorf("Инвалид токен")
+	return nil, fmt.Errorf("invalid token")
 }
 
 func (m *JWTMaker) ValidatePasswordResetToken(tokenString string) (*PasswordResetClaims, error) {

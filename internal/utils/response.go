@@ -43,11 +43,11 @@ func SuccessResponseWithMeta(c *gin.Context, statusCode int, message string, dat
 	})
 }
 
-func ErrorResponse(c *gin.Context, statusCode int, message string, err interface{}) {
+func ErrorResponse(c *gin.Context, statusCode int, message string, err error) {
 	c.JSON(statusCode, APIResponse{
 		Success: false,
 		Message: message,
-		Error: err,
+		Error: err.Error(),
 	})
 }
 

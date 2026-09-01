@@ -1,6 +1,7 @@
 package user
 
 import (
+	"avto-crm-api/internal/modules/client"
 	"avto-crm-api/internal/modules/deal"
 	"time"
 
@@ -18,8 +19,8 @@ type User struct {
 	MiddleName string `gorm:"not null" json:"middleName"`
 	LastName string `json:"lastName,omitempty"`
 
-	OwnerDeals []deal.Deal `gorm:"foreignKey:OwnerId" json:"ownerDeals"`
-	ClientDeals []deal.Deal `gorm:"foreignKey:ClientId" json:"clientDeals"`
+	Deals []deal.Deal `gorm:"foreignKey:OwnerID" json:"deals"`
+	Clients []client.Client `gorm:"foreignKey:OwnerID" json:"clients"`
 
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"updatedAt"`
