@@ -33,7 +33,7 @@ func (r *ClientRepository) Update(req *Client) error {
 func (r *ClientRepository) FindById(clientId string) (*Client, error) {
 	var client *Client
 
-	if err := r.db.Where("id = ?", client).First(&client).Error; err != nil {
+	if err := r.db.Where("id = ?", clientId).First(&client).Error; err != nil {
 		return nil, err
 	}
 

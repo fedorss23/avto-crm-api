@@ -108,7 +108,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	userID := c.Param("userId")
+	userID := c.GetString("userId")
 	
 	if userID == "" {
 		utils.ErrorResponse(c, http.StatusForbidden, "пользователь не авторизован", errors.New("wrong get userId as query param"))

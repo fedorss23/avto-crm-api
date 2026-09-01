@@ -51,7 +51,7 @@ func LoadConfig() *Config {
 		DBMaxOpenConns: dbmax,
 		DBMaxIdleConns: maxIdle,
 		DBConnMaxLifetime: lifetime,
-		JWTSecret: getEnv("SECRET", "pass@w0rd"),
+		JWTSecret: getEnv("JWT_SECRET", "pass@w0rd"),
 		Version: version,
 	}
 

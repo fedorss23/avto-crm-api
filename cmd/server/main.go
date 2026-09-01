@@ -7,6 +7,8 @@ import (
 	"avto-crm-api/internal/modules/car"
 	"avto-crm-api/internal/modules/client"
 	"avto-crm-api/internal/modules/deal"
+	"avto-crm-api/internal/modules/pipeline"
+	"avto-crm-api/internal/modules/stage"
 	"avto-crm-api/internal/modules/user"
 	"avto-crm-api/pkg/cookie"
 	"avto-crm-api/pkg/jwt"
@@ -14,10 +16,22 @@ import (
 	"log"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	router := gin.Default()
+
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: false, 
+		MaxAge:           12 * time.Hour,
+	}))
+
 	cfg := config.LoadConfig()
 
 	serviceConfig := &auth.Config{
@@ -45,12 +59,11 @@ func main() {
 	dealRepo := deal.NewDealRepository(db)
 	carRepo := car.NewCarRepository(db)
 	clientRepo := client.NewClientRepository(db)
-	// stageRepo := stage.NewStageRepository()
-	// pipelineRepo := pipeline.NewPipelineRepository()
-
+	stageRepo := stage.NewStageRepository()
+	pipelineRepo := pipeline.NewPipelineRepository()
 
 	authService := auth.NewAuthService(userRepo, jwtMaker, serviceConfig)
-	dealService := deal.NewDealService(db, dealRepo, carRepo)
+	dealService := deal.NewDealService(db, dealRepo, carRepo, pipelineRepo, stageRepo)
 	carService := car.NewCarService(carRepo)
 	clientSerivce := client.NewClientService(clientRepo)
 
@@ -60,8 +73,6 @@ func main() {
 	dealHandler := deal.NewDealHandler(dealService)
 	carHandler := car.NewCarHandler(carService)
 	clientHandler := client.NewClientHandler(clientSerivce)
-
-	router := gin.Default()
 
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())

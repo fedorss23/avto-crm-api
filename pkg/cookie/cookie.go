@@ -54,6 +54,16 @@ func (c *CookieConfig) ClearAuthCookies(ctx *gin.Context) {
 		c.Secure,
 		c.HttpOnly,
 	)
+
+	ctx.SetCookie(
+		"refresh_token", 
+		"", 
+		-1, 
+		c.Path,
+		c.Domain,
+		c.Secure,
+		c.HttpOnly,
+	)
 }
 
 func (c *CookieConfig) GetAccessToken(ctx *gin.Context) (string, error) {
