@@ -124,7 +124,7 @@ func (s *AuthService) RefreshToken(refreshToken string) (*RefreshResult, error) 
 
 	user, err := s.userRepo.FindById(claims.UserID)
 
-	if err != nil {
+	if err != nil || user == nil {
 		return nil, ErrUserNotFound
 	}
 
@@ -149,7 +149,7 @@ func (s *AuthService) RefreshToken(refreshToken string) (*RefreshResult, error) 
 
 func (s *AuthService) ChangePassword(userID string, req *ChangePasswordRequest) error {
 	user, err := s.userRepo.FindById(userID)
-	if err != nil {
+	if err != nil || user == nil {
 		return ErrUserNotFound
 	}
 
@@ -178,7 +178,7 @@ func (s *AuthService) ChangePassword(userID string, req *ChangePasswordRequest) 
 func (s *AuthService) GetProfile(userID string) (*UserResponse, error) {
 	user, err := s.userRepo.FindById(userID)
 
-	if err != nil {
+	if err != nil || user == nil {
 		return nil, ErrUserNotFound
 	}
 

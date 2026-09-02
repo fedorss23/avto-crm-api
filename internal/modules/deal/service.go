@@ -17,7 +17,13 @@ type DealService struct {
 	carRepo   *car.CarRepository
 }
 
-func NewDealService(db *gorm.DB, dealRepo *DealRepository, carRepo *car.CarRepository) *DealService {
+func NewDealService(
+	db *gorm.DB, 
+	dealRepo *DealRepository, 
+	carRepo *car.CarRepository, 
+	pipeRepo *pipeline.PipelineRepository, 
+	stageRepo *stage.StageRepository,
+) *DealService {
 	return &DealService{
 		db:       db,
 		dealRepo: dealRepo,
@@ -60,10 +66,10 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 		}
 
 		deal := &Deal{
-			Name:         req.Name,
-			Pipeline:     pipeline,
-			OwnerID:      oid,
-			Car:          car,
+			Name:     req.Name,
+			Pipeline: pipeline,
+			OwnerID:  oid,
+			Car:      car,
 		}
 
 		if err := s.dealRepo.Create(tx, deal); err != nil {
@@ -89,7 +95,7 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 			if index == 0 {
 				firstStageID = stage.ID
 			}
- 		}
+		}
 
 		deal.CurrentStage = &firstStageID
 
