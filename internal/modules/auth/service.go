@@ -53,6 +53,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 		Password: string(hash),
 		Name: req.Name,
 		LastName: req.LastName,
+		Role: "user",
 	}
 
 	if err := s.userRepo.Create(user); err != nil {

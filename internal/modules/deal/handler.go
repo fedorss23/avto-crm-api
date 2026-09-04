@@ -116,7 +116,7 @@ func (h *DealHandler) Update(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponseWithoutBody(c, http.StatusCreated, "deal successfully updated")
+	utils.SuccessResponse(c, http.StatusCreated, "deal successfully updated", req)
 }
 
 func (h *DealHandler) FindDealByOwnerId(c *gin.Context) {
@@ -128,22 +128,18 @@ func (h *DealHandler) FindDealByOwnerId(c *gin.Context) {
 
 	deals, total, err := h.dealService.FindDealByOwnerId(id)
 
-	resp := DealsResponse{
-		Deals: deals,
-		Total: total,
-	}
+	
 
 	if err != nil {
 		if deals != nil {
-			resp.Error = err
-			utils.SuccessResponse(c, http.StatusOK, "error with count total deals", &resp)
+			utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("error with count total deals: %s", err.Error()), deals)
 			return
 		}
 		utils.ErrorResponse(c, ErrorToHTTPStatus(err), "error with getting deals by owner id", err)
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusOK, "deals successfully found", resp)
+	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("deals successfully found: %d", total), deals)
 }
 
 func (h *DealHandler) FindDealByClientId(c *gin.Context) {
@@ -239,7 +235,7 @@ func (h *DealHandler) FindById(c *gin.Context) {
 	} else {
 		a, err := strconv.ParseBool(isFull)
 		if err != nil {
-			utils.ErrorResponse(c, http.StatusBadRequest, "Параметр isFull должен быть true или false", errors.New("Error with query param isFull"))
+			utils.ErrorResponse(c, http.StatusBadRequest, "Param isFull must be true or false", errors.New("Error with query param isFull"))
 			return
 		}
 		isFullBool = a
@@ -253,4 +249,86 @@ func (h *DealHandler) FindById(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, "deal successfully found", deal)
+}
+
+func (h *DealHandler) CancelDeal(c *gin.Context) {
+	dealId := c.Param("dealId")
+
+	if dealId == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Param dealId must be valid", errors.New("Missed dealId"))
+		return
+	}
+
+	ownerId := c.GetString("userId")
+
+	if ownerId == "" {
+		utils.ErrorResponse(c, http.StatusUnauthorized, "error with authorization", errors.New("you aren't authorized"))
+		return
+	}
+
+	err := h.dealService.ChangeStatus(ownerId, dealId, "inactive")
+
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "error with cancel deal", errors.New("error with cancel deal"))
+		return
+	}
+
+	utils.SuccessResponseWithoutBody(c, http.StatusOK, "deal successfully canceled")
+}
+
+func (h *DealHandler) ActiveDeal(c *gin.Context) {
+	dealId := c.Param("dealId")
+
+	if dealId == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Param dealId must be valid", errors.New("Missed dealId"))
+		return
+	}
+
+	ownerId := c.GetString("userId")
+
+	if ownerId == "" {
+		utils.ErrorResponse(c, http.StatusUnauthorized, "error with authorization", errors.New("you aren't authorized"))
+		return
+	}
+
+	err := h.dealService.ChangeStatus(ownerId, dealId, "active")
+
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "error with activate deal", err)
+		return
+	}
+
+	utils.SuccessResponseWithoutBody(c, http.StatusOK, "deal successfully activated")
+}
+
+func (h *DealHandler) ChangeStage(c *gin.Context) {
+	dealId := c.Param("dealId")
+
+	if dealId == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Param dealId must be valid", errors.New("Missed dealId"))
+		return
+	}
+
+	stageId, ok := c.GetQuery("stageId")
+
+	if !ok {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Query param stageId must be valid", errors.New("Missed stageId"))
+		return
+	}
+
+	ownerId := c.GetString("userId")
+
+	if ownerId == "" {
+		utils.ErrorResponse(c, http.StatusUnauthorized, "error with authorization", errors.New("you aren't authorized"))
+		return
+	}
+
+	err := h.dealService.ChangeStage(ownerId, dealId, stageId)
+
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "error with change stage of deal", err)
+		return
+	}
+
+	utils.SuccessResponseWithoutBody(c, http.StatusOK, "successfully change stage")
 }

@@ -31,7 +31,6 @@ http://localhost:8080/api/v1/deal/ba121f81-b362-46fb-8f19-dad29f4d72c7/next-stag
 
 {
 	"name": "huiall",
-	"status": "active",
 	"pipeline": {
 		"name": "first",
 		"source": "korea",
@@ -49,6 +48,11 @@ http://localhost:8080/api/v1/deal/ba121f81-b362-46fb-8f19-dad29f4d72c7/next-stag
 	},
 	"car": {
 		"model": "BMW"
+	},
+	"client": {
+		"name": "fewfe",
+		"email": "lesssa886@gmail.com",
+		"phone": "+79930797624"
 	}
 }
 
@@ -57,3 +61,8 @@ http://localhost:8080/api/v1/deal/ba121f81-b362-46fb-8f19-dad29f4d72c7/next-stag
 
 
 http://localhost:8080/api/v1/deal/by-id/808ad1fd-6d30-40c2-a5a3-4b00804096c1?isFull=true
+
+
+bf15432e-fdc7-4f43-af05-d88e96a9010a
+
+bf15432e-fdc7-4f43-af05-d88e96a9010a

@@ -16,7 +16,7 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 }
 
 func (r *UserRepository) FindById(id string) (*User, error) {
-	var user User
+	var user *User
 	if err := r.db.Where("id = ?", id).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -25,11 +25,11 @@ func (r *UserRepository) FindById(id string) (*User, error) {
 		return nil, err
 	}
 
-	return &user, nil
+	return user, nil
 }
 
 func (r *UserRepository) FindByEmail(email string) (*User, error) {
-	var user User
+	var user *User
 	if err := r.db.Where("email = ? ", email).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -38,7 +38,7 @@ func (r *UserRepository) FindByEmail(email string) (*User, error) {
 		return nil, err
 	}
 
-	return &user, nil
+	return user, nil
 }
 
 func (r *UserRepository) Create(user *User) error {
@@ -53,3 +53,17 @@ func (r *UserRepository) Delete(id string) error {
 	return r.db.Delete(&User{}, "id = ?", id).Error
 }
 
+func (r *UserRepository) FindList(page, limit int) ([]User, int64, error) {
+	var users []User
+	var total int64
+
+	offset := (page - 1) * limit
+
+	if err := r.db.Model(&User{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := r.db.Offset(offset).Limit(limit).Order("created_at DESC").Find(&users).Error
+
+	return users, total, err
+}
