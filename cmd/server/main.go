@@ -23,12 +23,15 @@ import (
 func main() {
 	router := gin.Default()
 
+	router.Use(gin.Logger())
+	router.Use(gin.Recovery())
+
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     []string{"http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: false, 
+		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
@@ -63,9 +66,11 @@ func main() {
 	pipelineRepo := pipeline.NewPipelineRepository()
 
 	authService := auth.NewAuthService(userRepo, jwtMaker, serviceConfig)
-	dealService := deal.NewDealService(db, dealRepo, carRepo, pipelineRepo, stageRepo)
+	dealService := deal.NewDealService(db, dealRepo, carRepo, pipelineRepo, stageRepo, clientRepo)
 	carService := car.NewCarService(carRepo)
 	clientSerivce := client.NewClientService(clientRepo)
+	pipelineService := pipeline.NewPipelineService(pipelineRepo, db)
+	userService := user.NewUserService(userRepo)
 
 	cookieConfig := cookie.NewCookieConfig(cfg.Domain, cfg.Secure)
 
@@ -73,9 +78,8 @@ func main() {
 	dealHandler := deal.NewDealHandler(dealService)
 	carHandler := car.NewCarHandler(carService)
 	clientHandler := client.NewClientHandler(clientSerivce)
-
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
+	pipelineHandler := pipeline.NewPipelineHandler(pipelineService)
+	userHandler := user.NewUserHandler(userService)
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -97,35 +101,51 @@ func main() {
 			aauth := auth.Group("")
 			aauth.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 			{
-				aauth.GET("/profile/", authHandler.GetProfile)
-				aauth.POST("/change-password/", authHandler.ChangePassword)
-				aauth.POST("/logout/", authHandler.Logout)
+				aauth.GET("/profile", authHandler.GetProfile)
+				aauth.POST("/change-password", authHandler.ChangePassword)
+				aauth.POST("/logout", authHandler.Logout)
 			}
 		}
 
 		deal := api.Group("/deal")
+		deal.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		{
-			deal.Use(middleware.AuthMiddleware(cfg.JWTSecret))
-
-			deal.GET("/", dealHandler.FindAll)
-			deal.GET("/by-owner/", dealHandler.FindDealByOwnerId)
+			deal.GET("", dealHandler.FindAll)
+			deal.GET("/by-owner", dealHandler.FindDealByOwnerId)
 			deal.GET("/by-client/:clientId", dealHandler.FindDealByClientId)
-			deal.POST("/", dealHandler.CreateFullDeal)
-			deal.PUT("/", dealHandler.Update)
+			deal.POST("", dealHandler.CreateFullDeal)
+			deal.PUT("", dealHandler.Update)
 			deal.POST("/:dealId/next-stage", dealHandler.SetNextStage)
 			deal.DELETE("/:dealId", dealHandler.Delete)
 			deal.GET("/by-id/:dealId", dealHandler.FindById)
+			deal.POST("/cancel/:dealId", dealHandler.CancelDeal)
+			deal.POST("/avtivate/:dealId", dealHandler.ActiveDeal)
+			deal.POST("/change-stage/:dealId", dealHandler.ChangeStage)
 		}
 
 		car := api.Group("/car")
 		{
-			car.GET("/", carHandler.FindAll)
-			car.POST("/", carHandler.Create)
+			car.GET("", carHandler.FindAll)
+			car.POST("", carHandler.Create)
 		}
 
 		client := api.Group("/client")
+		client.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		{
-			client.GET("/", clientHandler.FindById)
+			client.GET(":clientId", clientHandler.FindById)
+		}
+
+		pipeline := api.Group("/pipeline")
+		pipeline.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+		{
+			pipeline.GET("", pipelineHandler.FindList)
+		}
+
+		users := api.Group("/users")
+		users.Use(middleware.AdminMiddleware(cfg.JWTSecret))
+		{
+			users.GET("", userHandler.FindList)
+			users.DELETE(":userId", userHandler.Delete)
 		}
 	}
 

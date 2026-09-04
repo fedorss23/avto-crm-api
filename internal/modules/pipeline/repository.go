@@ -43,7 +43,7 @@ func (r *PipelineRepository) FindList(tx *gorm.DB, page, limit int) ([]Pipeline,
 		return nil, 0, err
 	}
 
-	err := tx.Offset(offset).Limit(limit).Order("created_at DESC").Find(&pipelines).Error
+	err := tx.Preload("Stages").Offset(offset).Limit(limit).Order("created_at DESC").Find(&pipelines).Error
 
 	return pipelines, total, err
 }

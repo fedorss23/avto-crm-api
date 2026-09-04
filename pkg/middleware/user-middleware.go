@@ -10,8 +10,8 @@ import (
 
 type Claims struct {
 	UserID string `json:"user_id"`
-	Email string `json:"email"`
-	Role string `json:"role"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -19,11 +19,16 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 
+		if c.Request.Method == http.MethodOptions {
+			c.Next()
+			return
+		}
+
 		if authHeader == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "missing authorization header",
 			})
-			return 
+			return
 		}
 
 		parts := strings.Split(authHeader, " ")
@@ -44,7 +49,7 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 				return []byte(secret), nil
 			},
 		)
-		
+
 		if err != nil || !token.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "invalid token",
@@ -65,5 +70,53 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 		c.Set("role", claims.Role)
 
 		c.Next()
- 	}
+	}
+}
+
+func AdminMiddleware(secret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
+
+		if header == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "no authorized",
+			})
+			return
+		}
+
+		parts := strings.Split(header, " ")
+
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "invalid token",
+			})
+			return
+		}
+
+		token, err := jwt.ParseWithClaims(parts[1], &Claims{},
+			func(t *jwt.Token) (interface{}, error) {
+				return []byte(secret), nil
+			})
+
+		if err != nil || !token.Valid {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "invalid token",
+			})
+			return
+		}
+
+		claims, ok := token.Claims.(Claims)
+		if !ok || claims.UserID == "" || claims.Role != "admin" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "invalid claims",
+			})
+			return
+		}
+
+		c.Set("userId", claims.UserID)
+		c.Set("email", claims.Email)
+		c.Set("role", claims.Role)
+
+		c.Next()
+	}
 }

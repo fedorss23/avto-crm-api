@@ -19,6 +19,8 @@ type User struct {
 	MiddleName string `gorm:"not null" json:"middleName"`
 	LastName string `json:"lastName,omitempty"`
 
+	Role string `json:"role"`
+
 	Deals []deal.Deal `gorm:"foreignKey:OwnerID" json:"deals"`
 	Clients []client.Client `gorm:"foreignKey:OwnerID" json:"clients"`
 

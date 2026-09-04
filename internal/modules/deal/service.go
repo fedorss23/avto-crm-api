@@ -2,8 +2,10 @@ package deal
 
 import (
 	"avto-crm-api/internal/modules/car"
+	"avto-crm-api/internal/modules/client"
 	"avto-crm-api/internal/modules/pipeline"
 	"avto-crm-api/internal/modules/stage"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -15,6 +17,7 @@ type DealService struct {
 	pipeRepo  *pipeline.PipelineRepository
 	stageRepo *stage.StageRepository
 	carRepo   *car.CarRepository
+	clientRepo *client.ClientRepository
 }
 
 func NewDealService(
@@ -23,23 +26,27 @@ func NewDealService(
 	carRepo *car.CarRepository, 
 	pipeRepo *pipeline.PipelineRepository, 
 	stageRepo *stage.StageRepository,
+	clientRepo *client.ClientRepository,
 ) *DealService {
 	return &DealService{
 		db:       db,
 		dealRepo: dealRepo,
 		carRepo:  carRepo,
+		pipeRepo: pipeRepo,
+		stageRepo: stageRepo,
+		clientRepo: clientRepo,
 	}
 }
 
 func (s *DealService) SetNextPage(ownerID, dealID string) (*Deal, error) {
-	return s.dealRepo.SetNextStage(s.db, ownerID, dealID)
+	return s.dealRepo.SetNextStage(ownerID, dealID)
 }
 
 func (s *DealService) FindAll(page, limit int, isFull bool) ([]Deal, int64, error) {
 	if isFull {
-		return s.dealRepo.FindListWithAll(s.db, page, limit)
+		return s.dealRepo.FindListWithAll(page, limit)
 	} else {
-		return s.dealRepo.FindList(s.db, page, limit)
+		return s.dealRepo.FindList(page, limit)
 	}
 }
 
@@ -49,10 +56,6 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 			Name:        req.Pipeline.Name,
 			Source:      req.Pipeline.Source,
 			Destination: req.Pipeline.Destination,
-		}
-
-		if err := s.pipeRepo.Create(tx, pipeline); err != nil {
-			return err
 		}
 
 		car := &car.Car{
@@ -65,11 +68,32 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 			return err
 		}
 
+		client := &client.Client{
+			Name: req.Client.Name,
+			OwnerID: oid,
+		}
+
+		if req.Client.Email != nil  {
+			client.Email = req.Client.Email
+		}
+
+		if req.Client.Phone != nil {
+			client.Phone = req.Client.Phone
+		}
+
+		now := time.Now()
+
+		dueDate := now.AddDate(0, 0, req.Term)
+
 		deal := &Deal{
 			Name:     req.Name,
 			Pipeline: pipeline,
 			OwnerID:  oid,
 			Car:      car,
+			Client: client,
+			Term: req.Term,
+			DueDate: dueDate,
+			Total: req.Total,
 		}
 
 		if err := s.dealRepo.Create(tx, deal); err != nil {
@@ -77,6 +101,7 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 		}
 
 		var firstStageID uuid.UUID
+		var currentStageName string
 
 		for index, i := range req.Pipeline.Stages {
 			stage := stage.Stage{
@@ -94,10 +119,15 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 
 			if index == 0 {
 				firstStageID = stage.ID
+				currentStageName = stage.Name
 			}
 		}
 
-		deal.CurrentStage = &firstStageID
+		deal.PipelineId = &pipeline.ID
+		deal.ClientId = &client.ID
+		deal.CarId = &car.ID
+		deal.CurrentStageId = &firstStageID
+		deal.CurrentStageName = &currentStageName
 
 		if err := s.dealRepo.Update(tx, deal); err != nil {
 			return err
@@ -112,21 +142,29 @@ func (s *DealService) Update(req *Deal) error {
 }
 
 func (s *DealService) FindDealByOwnerId(ownerID string) ([]Deal, int64, error) {
-	return s.dealRepo.FindByOwnerId(s.db, ownerID)
+	return s.dealRepo.FindByOwnerId(ownerID)
 }
 
 func (s *DealService) FindDealByClientId(clientID string) ([]Deal, int64, error) {
-	return s.dealRepo.FindByClientID(s.db, clientID)
+	return s.dealRepo.FindByClientID(clientID)
 }
 
 func (s *DealService) Delete(ownerID, dealID string) error {
-	return s.dealRepo.Delete(s.db, ownerID, dealID)
+	return s.dealRepo.Delete(ownerID, dealID)
 }
 
 func (s *DealService) FindById(id string, isFull bool) (*Deal, error) {
 	if isFull {
-		return s.dealRepo.FindFullById(s.db, id)
+		return s.dealRepo.FindFullById(id)
 	} else {
-		return s.dealRepo.FindById(s.db, id)
+		return s.dealRepo.FindById(id)
 	}
+}
+
+func (s *DealService) ChangeStatus(ownerID, dealID, status string) error {
+	return s.dealRepo.ChangeStatus(ownerID, dealID, status)
+}
+
+func (s *DealService) ChangeStage(ownerId, dealId, stageId string) error {
+	return s.dealRepo.SetStage(ownerId, dealId, stageId)
 }
