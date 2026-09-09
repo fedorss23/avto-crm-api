@@ -19,6 +19,16 @@ type PaginationMeta struct {
 	TotalPages int `json:"totalPages"`
 }
 
+type ErrorResponseData struct {
+	Err string `json:"err"`
+	Code string `json:"code"`
+}
+
+type ValidationErrorResponseData struct {
+	Err map[string]string `json:"err"`
+	Code string `json:"code"`
+}
+
 func SuccessResponse(c *gin.Context, statusCode int, message string, data interface{}) {
 	c.JSON(statusCode, APIResponse{
 		Success: true,
@@ -43,18 +53,24 @@ func SuccessResponseWithMeta(c *gin.Context, statusCode int, message string, dat
 	})
 }
 
-func ErrorResponse(c *gin.Context, statusCode int, message string, err error) {
+func ErrorResponse(c *gin.Context, statusCode int, message string, err error, code string) {
 	c.JSON(statusCode, APIResponse{
 		Success: false,
 		Message: message,
-		Error: err.Error(),
+		Error: ErrorResponseData{
+			Err: err.Error(),
+			Code: code,
+		},
 	})
 }
 
-func ValidationErrorResponse(c *gin.Context, errors map[string]string) {
+func ValidationErrorResponse(c *gin.Context, errors map[string]string, code string) {
 	c.JSON(400, APIResponse{
 		Success: false,
 		Message: "Ошибка валидации",
-		Error: errors,
+		Error: ValidationErrorResponseData{
+			Err: errors,
+			Code: code,
+		},
 	})
 }

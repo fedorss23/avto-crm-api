@@ -38,3 +38,8 @@ type ClientRequest struct {
 	Phone *string `json:"phone"`
 	Email *string `json:"email"`
 }
+
+type DealsWithTotal struct {
+	Deals []Deal `json:"deals"`
+	Total int `json:"total"`
+}

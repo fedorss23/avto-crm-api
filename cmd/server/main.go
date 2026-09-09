@@ -85,7 +85,7 @@ func main() {
 		c.JSON(200, gin.H{
 			"status":  "OK",
 			"time":    time.Now().Format(time.RFC3339),
-			"service": "hvjghjjgvjg",
+			"service": "service working",
 		})
 	})
 
@@ -111,7 +111,7 @@ func main() {
 		deal.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		{
 			deal.GET("", dealHandler.FindAll)
-			deal.GET("/by-owner", dealHandler.FindDealByOwnerId)
+			deal.GET("/by-owner", dealHandler.FindDealsByOwnerId)
 			deal.GET("/by-client/:clientId", dealHandler.FindDealByClientId)
 			deal.POST("", dealHandler.CreateFullDeal)
 			deal.PUT("", dealHandler.Update)

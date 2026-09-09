@@ -4,8 +4,6 @@ import (
 	"avto-crm-api/internal/modules/user"
 	"avto-crm-api/internal/utils"
 	"avto-crm-api/pkg/jwt"
-	"fmt"
-	"log"
 	"time"
 )
 
@@ -36,16 +34,18 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 		return nil, err
 	}
 
-	log.Println(existingUser)
-
 	if existingUser != nil {
-		return nil, ErrEmailAlreadyExists
+		return nil, utils.ErrEmailAlredyExists
+	}
+
+	if !utils.ValidatePassword(req.Password) {
+		return nil, utils.ErrPasswordIncorrectRegister
 	}
 
 	hash, err := utils.Hash(req.Password)
 
 	if err != nil {
-		return nil, fmt.Errorf("Ошибка при хэшировании пароля: %w", err)
+		return nil, err
 	}
 
 	user := &user.User{
@@ -57,13 +57,13 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 	}
 
 	if err := s.userRepo.Create(user); err != nil {
-		return nil, fmt.Errorf("Ошибка при создании пользователя: %w", err)
+		return nil, err
 	}
 
 	tokens, err := s.generateTokens(user)
 
 	if err != nil {
-		return nil, fmt.Errorf("Ошибка при создании токенов: %w", err)
+		return nil, err
 	}
 
 	return &AuthResponse{
@@ -78,11 +78,11 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 func (s *AuthService) Login(req *LoginRequest, ip string) (*LoginResult, error) {
 	user, err := s.userRepo.FindByEmail(req.Email)
 	if err != nil {
-		return nil, fmt.Errorf("Ошибка при поиске пользователя: %w", err)
+		return nil, err
 	}
 
 	if user == nil {
-		return nil, ErrInvalidCredentials
+		return nil, utils.ErrInvalidCredentials
 	}
 
 	// if err := s.isLocked(user); err != nil {
@@ -92,7 +92,7 @@ func (s *AuthService) Login(req *LoginRequest, ip string) (*LoginResult, error) 
 	match, err := utils.Verify(req.Password, user.Password) 
 
 	if err != nil || !match {
-		return  nil, ErrInvalidCredentials
+		return  nil, utils.ErrPasswordIncorrectLogin
 	}
 
 	// s.resetLoginAttempts(user.ID)
@@ -104,7 +104,7 @@ func (s *AuthService) Login(req *LoginRequest, ip string) (*LoginResult, error) 
 	tokenResponse, err := s.generateTokens(user)
 
 	if err != nil {
-		return nil, fmt.Errorf("Ошибка при получении токенов: %w", err)
+		return nil, err
 	}
 
 	return &LoginResult{
@@ -120,19 +120,19 @@ func (s *AuthService) RefreshToken(refreshToken string) (*RefreshResult, error) 
 	claims, err := s.jwtMaker.ValidateRefreshToken(refreshToken)
 
 	if err != nil {
-		return nil, ErrInvalidRefreshToken
+		return nil, utils.ErrInvalidRefreshToken
 	}
 
 	user, err := s.userRepo.FindById(claims.UserID)
 
 	if err != nil || user == nil {
-		return nil, ErrUserNotFound
+		return nil, err
 	}
 
 	tokenResponse, err := s.generateTokens(user)
 
 	if err != nil {
-		return nil, fmt.Errorf("Ошибка при получении токенов: %w", err)
+		return nil, err
 	}
 
 	return &RefreshResult{
@@ -151,24 +151,24 @@ func (s *AuthService) RefreshToken(refreshToken string) (*RefreshResult, error) 
 func (s *AuthService) ChangePassword(userID string, req *ChangePasswordRequest) error {
 	user, err := s.userRepo.FindById(userID)
 	if err != nil || user == nil {
-		return ErrUserNotFound
+		return err
 	}
 
 	match, err := utils.Verify(req.OldPassword, user.Password)
 
 	if err != nil || !match {
-		return ErrOldPasswordIncorrect
+		return utils.ErrPasswordIncorrectRegister
 	}
 
 	hashPassword, err := utils.Hash(req.NewPassword)
 	if err != nil {
-		return fmt.Errorf("Ошибка при получении хэша пароля: %w", err)
+		return err
 	}
 
 	user.Password = hashPassword
 
 	if err := s.userRepo.Update(user); err != nil {
-		return fmt.Errorf("Ошибка при смене пароля: %w", err)
+		return err
 	}
 
 	//добавление токена в blacklist
@@ -180,7 +180,7 @@ func (s *AuthService) GetProfile(userID string) (*UserResponse, error) {
 	user, err := s.userRepo.FindById(userID)
 
 	if err != nil || user == nil {
-		return nil, ErrUserNotFound
+		return nil, err
 	}
 
 	return s.toUserResponse(user), nil

@@ -2,11 +2,8 @@ package car
 
 import (
 	"avto-crm-api/internal/utils"
-	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,12 +22,12 @@ func (h *CarHandler) Create(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs)
+		utils.ValidationErrorResponse(c, errs, utils.ValidationErrorCode)
 		return
 	}
 
 	if err := h.carService.carRepo.Create(req); err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, "Ошибка на сервере", err)
+		utils.ErrorResponse(c, http.StatusBadRequest, err.Error(), err, CodeByError(err))
 		return
 	}
 
@@ -38,34 +35,20 @@ func (h *CarHandler) Create(c *gin.Context) {
 }
 
 func (h *CarHandler) FindAll(c *gin.Context) {
-	page, exists := c.GetQuery("page")
-	if !exists {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Ошибка при получении сделок: пропущен query-параметер page", errors.New("Error with query param: page"))
+	var page int
+	if err := utils.GetNumberQuery(c, "page", &page, 1, pageErrorCode); err != nil {
 		return
 	}
 
-	limit, exists := c.GetQuery("limit")
-	if !exists {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Ошибка при получении сделок: пропущен query-параметер limit", errors.New("Error with query param: limit"))
+	var limit int
+	if err := utils.GetNumberQuery(c, "limit", &limit, 10, limitErrorCode); err != nil {
 		return
 	}
 
-	intPage, err := strconv.Atoi(page)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Ошибка при получении сделок: параметр page должен быть int", errors.New("Query param page must be a int"))
-		return
-	}
-
-	intLimit, err := strconv.Atoi(limit)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Ошибка при получении сделок: параметр page должен быть int", errors.New("Query param page must be a int"))
-		return
-	}
-
-	cars, total, err := h.carService.FindList(intPage, intLimit)
+	cars, total, err := h.carService.FindList(page, limit)
 
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, "Ошибка при получении машин", err)
+		utils.ErrorResponse(c, http.StatusBadRequest, err.Error(), err, CodeByError(err))
 		return
 	}
 
@@ -80,12 +63,12 @@ func (h *CarHandler) Update(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs)
+		utils.ValidationErrorResponse(c, errs, utils.ValidationErrorCode)
 		return
 	}
 
 	if err := h.carService.Update(req); err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, "Ошибка при обновлении машины: ошибка со стороны сервера", err)
+		utils.ErrorResponse(c, http.StatusBadRequest, err.Error(), err, CodeByError(err))
 		return
 	}
 
