@@ -10,8 +10,8 @@ func NewUserService(userRepo *UserRepository) *UserService {
 	}
 }
 
-func (r *UserService) Delete(userId string) error {
-	return r.userRepo.Delete(userId)
+func (r *UserService) Delete(userId, ownerId string) error {
+	return r.userRepo.Delete(userId, ownerId)
 }
 
 func (r *UserService) FindList(page, limit int) ([]User, int64, error) {

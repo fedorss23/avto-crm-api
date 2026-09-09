@@ -2,11 +2,8 @@ package user
 
 import (
 	"avto-crm-api/internal/utils"
-	"errors"
 	"fmt"
 	"net/http"
-
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,17 +19,20 @@ func NewUserHandler(userService *UserService) *UserHandler {
 }
 
 func (h *UserHandler) Delete(c *gin.Context) {
-	userId := c.Param("userId")
-
-	if userId == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "error with param user id", errors.New("missing param userId"))
+	var userId string
+	if err := utils.GetStringRequiredQuery(c, "userId", &userId); err != nil {
 		return
 	}
 
-	err := h.userService.Delete(userId)
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+		return
+	}
+
+	err := h.userService.Delete(userId, ownerId)
 
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "error with deleting user", err)
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
 		return
 	}
 
@@ -40,38 +40,20 @@ func (h *UserHandler) Delete(c *gin.Context) {
 }
 
 func (h *UserHandler) FindList(c *gin.Context) {
-	var pageInt int
-	
-	page, exists := c.GetQuery("page")
-	if !exists {
-		pageInt = 1
-	} else {
-		a, err := strconv.Atoi(page)
-		if err != nil {
-			utils.ErrorResponse(c, http.StatusBadRequest, "Error with found users: query-param page must be number", errors.New("Page must be number"))
-			return
-		}
-		pageInt = a
+	var page int
+	if err := utils.GetNumberQuery(c, "page", &page, 1, ""); err != nil {
+		return
 	}
 
-	var limitInt int
-
-	limit, exists := c.GetQuery("limit")
-	if !exists {
-		limitInt = 10
-	} else {
-		a, err := strconv.Atoi(limit)
-		if err != nil {
-			utils.ErrorResponse(c, http.StatusBadRequest, "Error with found users: query-param limit must be number", errors.New("Limit must be number"))
-			return
-		}
-		limitInt = a
+	var limit int
+	if err := utils.GetNumberQuery(c, "limit", &limit, 10, ""); err != nil {
+		return
 	}
 
-	users, total, err := h.userService.FindList(pageInt, limitInt)
+	users, total, err := h.userService.FindList(page, limit)
 
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Error with found users", err)
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("successfully found: %d", total), users)

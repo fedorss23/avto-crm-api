@@ -2,10 +2,8 @@ package client
 
 import (
 	"avto-crm-api/internal/utils"
-	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,64 +19,45 @@ func NewClientHandler(clientService *ClientService) *ClientHandler {
 }
 
 func (h *ClientHandler) FindById(c *gin.Context) {
-	id := c.Param("clientId")
-
-	if id == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "missed client id", errors.New("missed client id"))
-		return 
+	var clientId string
+	if err := utils.GetParam(c, "clientId", &clientId); err != nil {
+		return
 	}
 
-	ownerId := c.GetString("userId")
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+		return
+	}
 
-	client, err := h.clientService.FindById(id, ownerId)
+	client, err := h.clientService.FindById(clientId, ownerId)
 
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, "error with getting client by id", err)
-		return
+		utils.ErrorResponse(c, ErrorToHTTPStatus(err), err.Error(), err, CodeByError(err))
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, "successfully getting client", client)
 }
 
 func (h *ClientHandler) FindListByOwnerId(c *gin.Context) {
-	var pageInt int
-
-	page, ok := c.GetQuery("page")
-	if !ok {
-		pageInt = 1
-	} else {
-		a, err := strconv.Atoi(page)
-		if err != nil {
-			utils.ErrorResponse(c, http.StatusBadRequest, "page must be a number", errors.New("page must be a number"))
-			return
-		}
-		pageInt = a
-	}
-
-	var limitInt int
-
-	limit, ok := c.GetQuery("limit")
-	if !ok {
-		limitInt = 10
-	} else {
-		a, err := strconv.Atoi(limit)
-		if err != nil {
-			utils.ErrorResponse(c, http.StatusBadRequest, "limit must be a number", errors.New("limit must be a number"))
-			return
-		}
-		limitInt = a
-	}
-
-	ownerId := c.GetString("userId")
-	if ownerId == "" {
-		utils.ErrorResponse(c, 401, "you aren't authorized", errors.New("you need to authorize"))
+	var page int
+	if err := utils.GetNumberQuery(c, "page", &page, 1, pageErrorCode); err != nil {
 		return
 	}
 
-	clients, total, err := h.clientService.FindListByOwnerId(ownerId, pageInt, limitInt)
+	var limit int
+	if err := utils.GetNumberQuery(c, "limit", &limit, 1, limitErrorCode); err != nil {
+		return
+	}
+
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+		return
+	}
+
+	clients, total, err := h.clientService.FindListByOwnerId(ownerId, page, limit)
 
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "failed with getting clients", err)
+		utils.ErrorResponse(c, http.StatusBadRequest, err.Error(), err, CodeByError(err))
 		return
 	}
 

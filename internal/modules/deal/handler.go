@@ -2,10 +2,8 @@ package deal
 
 import (
 	"avto-crm-api/internal/utils"
-	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,81 +19,52 @@ func NewDealHandler(dealService *DealService) *DealHandler {
 }
 
 func (h *DealHandler) FindAll(c *gin.Context) {
-	var pageInt int
+	var page int
+	if err := utils.GetNumberQuery(c, "page", &page, 1, utils.PageErrorCode); err != nil {
+		return
+	}
 	
-	page, exists := c.GetQuery("page")
-	if !exists {
-		pageInt = 1
-	} else {
-		a, err := strconv.Atoi(page)
-		if err != nil {
-			utils.ErrorResponse(c, http.StatusBadRequest, "Error with found deal: query-param page must be number", errors.New("Page must be number"))
-			return
-		}
-		pageInt = a
-	}
-
-	var limitInt int
-
-	limit, exists := c.GetQuery("limit")
-	if !exists {
-		limitInt = 10
-	} else {
-		a, err := strconv.Atoi(limit)
-		if err != nil {
-			utils.ErrorResponse(c, http.StatusBadRequest, "Error with found deal: query-param limit must be number", errors.New("Limit must be number"))
-			return
-		}
-		limitInt = a
-	}
-
-	isFull, exists := c.GetQuery("isFull")
-
-	var isFullBool bool
-
-	if !exists {
-		isFullBool = false
-	} else {
-		a, err := strconv.ParseBool(isFull)
-		if err != nil {
-			utils.ErrorResponse(c, http.StatusBadRequest, "Параметр isFull должен быть true или false", errors.New("Error with query param isFull"))
-			return
-		}
-		isFullBool = a
-	}
-
-	var deals []Deal
-	var total int64
-	var ferr error
-
-	deals, total, ferr = h.dealService.FindAll(pageInt, limitInt, isFullBool)
-
-	if ferr != nil {
-		utils.ErrorResponse(c, ErrorToHTTPStatus(ferr), "Error with getting deals", ferr)
+	var limit int
+	if err := utils.GetNumberQuery(c, "limit", &limit, 10, utils.LimitErrorCode); err != nil {
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("Успешное получение данных: %d", total), deals)
+	var isFull bool
+	if err := utils.GetBoolQuery(c, "isFull", &isFull, false, utils.IsFullErrorCode); err != nil {
+		return
+	}
+
+	deals, total, err := h.dealService.FindAll(page, limit, isFull)
+
+	if err != nil {
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
+		return
+	}
+
+	data := &DealsWithTotal{
+		Deals: deals,
+		Total: int(total),
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("Успешное получение данных: %d", total), data)
 }
 
 func (h *DealHandler) CreateFullDeal(c *gin.Context) {
 	var req CreateDealRequest
 
-	ownerId := c.GetString("userId")
-
-	if ownerId == "" {
-		utils.ErrorResponse(c, http.StatusForbidden, "you are not authorized", errors.New("not authorized"))
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
 		return
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs)
+		utils.ValidationErrorResponse(c, errs, utils.ValidationErrorCode)
 		return
 	}
 
 	if err := h.dealService.CreateFullDeal(&req, ownerId); err != nil {
-		utils.ErrorResponse(c, ErrorToHTTPStatus(err), "error with creating deal", err)
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "error with creating deal", err, utils.CodeByError(err))
 		return
 	}
 
@@ -105,51 +74,32 @@ func (h *DealHandler) CreateFullDeal(c *gin.Context) {
 func (h *DealHandler) Update(c *gin.Context) {
 	var req Deal
 
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+		return
+	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs)
+		utils.ValidationErrorResponse(c, errs, utils.ValidationErrorCode)
 		return
 	}
 
-	if err := h.dealService.Update(&req); err != nil {
-		utils.ErrorResponse(c, ErrorToHTTPStatus(err), "error with updating deal", err)
+	if err := h.dealService.Update(&req, ownerId); err != nil {
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusCreated, "deal successfully updated", req)
+	utils.SuccessResponse(c, http.StatusOK, "deal successfully updated", req)
 }
 
-func (h *DealHandler) FindDealByOwnerId(c *gin.Context) {
-	id := c.GetString("userId")
-	if id == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "you need to provide a query param: userId", errors.New("missing userId"))
+func (h *DealHandler) FindDealsByOwnerId(c *gin.Context) {
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
 		return
 	}
 
-	deals, total, err := h.dealService.FindDealByOwnerId(id)
-
-	
-
-	if err != nil {
-		if deals != nil {
-			utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("error with count total deals: %s", err.Error()), deals)
-			return
-		}
-		utils.ErrorResponse(c, ErrorToHTTPStatus(err), "error with getting deals by owner id", err)
-		return
-	}
-
-	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("deals successfully found: %d", total), deals)
-}
-
-func (h *DealHandler) FindDealByClientId(c *gin.Context) {
-	id := c.Param("userId")
-	if id == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "you need to provide a query param: userId", errors.New("missing userId"))
-		return
-	}
-
-	deals, total, err := h.dealService.FindDealByClientId(id)
+	deals, total, err := h.dealService.FindDealByOwnerId(ownerId)
 
 	resp := DealsResponse{
 		Deals: deals,
@@ -158,11 +108,45 @@ func (h *DealHandler) FindDealByClientId(c *gin.Context) {
 
 	if err != nil {
 		if deals != nil {
-			resp.Error = err
-			utils.SuccessResponse(c, http.StatusOK, "error with count total deals", &resp)
+			utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("error with count total deals: %s", err.Error()), &resp)
 			return
 		}
-		utils.ErrorResponse(c, ErrorToHTTPStatus(err), "error with getting deals by client id", err)
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "error with getting deals by owner id", err, utils.CodeByError(err))
+		return
+	}
+
+	data := &DealsWithTotal{
+		Deals: deals,
+		Total: int(total),
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("deals successfully found: %d", total), data)
+}
+
+func (h *DealHandler) FindDealByClientId(c *gin.Context) {
+	var clientId string
+	if err := utils.GetParam(c, "clientId", &clientId); err != nil {
+		return
+	}
+
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+		return
+	}
+
+	deals, total, err := h.dealService.FindDealByClientId(clientId, ownerId)
+
+	resp := DealsResponse{
+		Deals: deals,
+		Total: total,
+	}
+
+	if err != nil {
+		if deals != nil {
+			utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("error with count total deals: %s", err.Error()), &resp)
+			return
+		}
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "error with getting deals by client id", err, utils.CodeByError(err))
 		return
 	}
 
@@ -170,23 +154,20 @@ func (h *DealHandler) FindDealByClientId(c *gin.Context) {
 }
 
 func (h *DealHandler) SetNextStage(c *gin.Context) {
-	dealId := c.Param("dealId")
-
-	if dealId == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Param dealId must be valid", errors.New("Missed dealId"))
+	var dealId string
+	if err := utils.GetParam(c, "dealId", &dealId); err != nil {
 		return
 	}
 
-	userId := c.GetString("userId")
-
-	if userId == "" {
-		utils.ErrorResponse(c, http.StatusUnauthorized, "error with authorization", errors.New("you aren't authorized"))
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+		return
 	}
 
-	deal, err := h.dealService.SetNextPage(userId, dealId)
+	deal, err := h.dealService.SetNextStage(ownerId, dealId)
 
 	if err != nil {
-		utils.ErrorResponse(c, ErrorToHTTPStatus(err), "error with change stage", err)
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "error with change stage", err, utils.CodeByError(err))
 		return
 	}
 
@@ -194,24 +175,20 @@ func (h *DealHandler) SetNextStage(c *gin.Context) {
 }
 
 func (h *DealHandler) Delete(c *gin.Context) {
-	ownerId := c.GetString("userId")
-
-	if ownerId == "" {
-		utils.ErrorResponse(c, http.StatusUnauthorized, "error with authorization", errors.New("you aren't authorized"))
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
 		return
 	}
 
-	dealId := c.Param("dealId")
-
-	if dealId == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Param dealId must be valid", errors.New("Missed dealId"))
+	var dealId string
+	if err := utils.GetParam(c, "dealId", &dealId); err != nil {
 		return
 	}
 
 	err := h.dealService.Delete(ownerId, dealId)
 
 	if err != nil {
-		utils.ErrorResponse(c, ErrorToHTTPStatus(err), "Error with delete deal", err)
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "Error with delete deal", err, utils.CodeByError(err))
 		return
 	}
 
@@ -219,32 +196,25 @@ func (h *DealHandler) Delete(c *gin.Context) {
 }
 
 func (h *DealHandler) FindById(c *gin.Context) {
-	id := c.Param("dealId")
-
-	if id == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Param dealId must be valid", errors.New("Missed dealId"))
+	var dealId string
+	if err := utils.GetParam(c, "dealId", &dealId); err != nil {
 		return
 	}
 
-	isFull, exists := c.GetQuery("isFull")
-
-	var isFullBool bool
-
-	if !exists {
-		isFullBool = false
-	} else {
-		a, err := strconv.ParseBool(isFull)
-		if err != nil {
-			utils.ErrorResponse(c, http.StatusBadRequest, "Param isFull must be true or false", errors.New("Error with query param isFull"))
-			return
-		}
-		isFullBool = a
+	var isFull bool
+	if err := utils.GetBoolQuery(c, "isFull", &isFull, false, utils.IsFullErrorCode); err != nil {
+		return
 	}
 
-	deal, err := h.dealService.FindById(id, isFullBool)
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+		return
+	}
+
+	deal, err := h.dealService.FindById(ownerId, dealId, isFull)
 
 	if err != nil {
-		utils.ErrorResponse(c, ErrorToHTTPStatus(err), "Error with found deal by id", err)
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "Error with found deal by id", err, utils.CodeByError(err))
 		return
 	}
 
@@ -252,24 +222,20 @@ func (h *DealHandler) FindById(c *gin.Context) {
 }
 
 func (h *DealHandler) CancelDeal(c *gin.Context) {
-	dealId := c.Param("dealId")
-
-	if dealId == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Param dealId must be valid", errors.New("Missed dealId"))
+	var dealId string
+	if err := utils.GetParam(c, "dealId", &dealId); err != nil {
 		return
 	}
 
-	ownerId := c.GetString("userId")
-
-	if ownerId == "" {
-		utils.ErrorResponse(c, http.StatusUnauthorized, "error with authorization", errors.New("you aren't authorized"))
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
 		return
 	}
 
 	err := h.dealService.ChangeStatus(ownerId, dealId, "inactive")
 
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, "error with cancel deal", errors.New("error with cancel deal"))
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "error with cancel deal", err, utils.CodeByError(err))
 		return
 	}
 
@@ -277,24 +243,20 @@ func (h *DealHandler) CancelDeal(c *gin.Context) {
 }
 
 func (h *DealHandler) ActiveDeal(c *gin.Context) {
-	dealId := c.Param("dealId")
-
-	if dealId == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Param dealId must be valid", errors.New("Missed dealId"))
+	var dealId string
+	if err := utils.GetParam(c, "dealId", &dealId); err != nil {
 		return
 	}
 
-	ownerId := c.GetString("userId")
-
-	if ownerId == "" {
-		utils.ErrorResponse(c, http.StatusUnauthorized, "error with authorization", errors.New("you aren't authorized"))
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
 		return
 	}
 
 	err := h.dealService.ChangeStatus(ownerId, dealId, "active")
 
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, "error with activate deal", err)
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "error with activate deal", err, utils.CodeByError(err))
 		return
 	}
 
@@ -302,31 +264,25 @@ func (h *DealHandler) ActiveDeal(c *gin.Context) {
 }
 
 func (h *DealHandler) ChangeStage(c *gin.Context) {
-	dealId := c.Param("dealId")
-
-	if dealId == "" {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Param dealId must be valid", errors.New("Missed dealId"))
+	var dealId string
+	if err := utils.GetParam(c, "dealId", &dealId); err != nil {
 		return
 	}
 
-	stageId, ok := c.GetQuery("stageId")
-
-	if !ok {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Query param stageId must be valid", errors.New("Missed stageId"))
+	var stageId string
+	if err := utils.GetStringRequiredQuery(c, "stageId", &stageId); err != nil {
 		return
 	}
 
-	ownerId := c.GetString("userId")
-
-	if ownerId == "" {
-		utils.ErrorResponse(c, http.StatusUnauthorized, "error with authorization", errors.New("you aren't authorized"))
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
 		return
 	}
 
 	err := h.dealService.ChangeStage(ownerId, dealId, stageId)
 
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, "error with change stage of deal", err)
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "error with change stage of deal", err, utils.CodeByError(err))
 		return
 	}
 
