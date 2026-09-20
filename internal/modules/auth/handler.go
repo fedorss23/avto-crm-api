@@ -1,22 +1,26 @@
 package auth
 
 import (
+	"avto-crm-api/internal/blacklist"
 	"avto-crm-api/internal/utils"
 	"avto-crm-api/pkg/cookie"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 type AuthHandler struct {
-	service      *AuthService
-	cookieConfig *cookie.CookieConfig
+	service          *AuthService
+	cookieConfig     *cookie.CookieConfig
+	blacklistService *blacklist.BlacklistService
 }
 
-func NewAuthHandler(service *AuthService, cfg *cookie.CookieConfig) *AuthHandler {
+func NewAuthHandler(service *AuthService, cfg *cookie.CookieConfig, blacklistService *blacklist.BlacklistService) *AuthHandler {
 	return &AuthHandler{
-		service:      service,
-		cookieConfig: cfg,
+		service:          service,
+		cookieConfig:     cfg,
+		blacklistService: blacklistService,
 	}
 }
 
@@ -25,7 +29,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs, utils.ValidationErrorCode)
+		utils.ValidationErrorResponse(c, errs)
 		return
 	}
 
@@ -50,7 +54,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs, utils.ValidationErrorCode)
+		utils.ValidationErrorResponse(c, errs)
 		return
 	}
 
@@ -72,10 +76,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 func (h *AuthHandler) Refresh(c *gin.Context) {
-	refreshToken, err := h.cookieConfig.GetRefreshToken(c)
-
+	refreshToken, refreshTtl, err := h.getTtlForRefreshToken(c)
 	if err != nil {
-		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
 		return
 	}
 
@@ -86,7 +88,22 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	h.cookieConfig.SetRefreshToken(c, refreshToken)
+	h.cookieConfig.SetRefreshToken(c, tokens.RefreshToken)
+
+	accessToken, accessTtl, err := h.getTtlForAccessToken(c)
+	if err != nil {
+		return
+	}
+
+	if err := h.blacklistService.Add(c.Request.Context(), refreshToken, refreshTtl); err != nil {
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
+		return
+	}
+
+	if err := h.blacklistService.Add(c.Request.Context(), accessToken, accessTtl); err != nil {
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
+		return
+	}
 
 	ans := &RegisterResponse{
 		User:        tokens.User,
@@ -97,16 +114,29 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	var userId string
-	if err := utils.GetOwnerId(c, &userId); err != nil {
-		return
-	}
+	// refreshToken, refreshTtl, err := h.getTtlForRefreshToken(c)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
 
-	// логика добавления токена в blacklist
-	// refreshToken, _ := h.cookieConfig.GetRefreshToken(c)
-	// ctx := c.Request.Context()
-	// refreshToken из cookie и вызов h.service.Logout(ctx, userID token)
-	// далее обработка ошибки если есть
+	// accessToken, accessTtl, err := h.getTtlForAccessToken(c)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+
+	// if err := h.blacklistService.Add(c.Request.Context(), refreshToken, refreshTtl); err != nil {
+	// 	fmt.Println(err)
+	// 	utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
+	// 	return
+	// }
+
+	// if err := h.blacklistService.Add(c.Request.Context(), accessToken, accessTtl); err != nil {
+	// 	fmt.Println(err)
+	// 	utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
+	// 	return
+	// }
 
 	h.cookieConfig.ClearAuthCookies(c)
 
@@ -123,18 +153,40 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs, utils.ValidationErrorCode)
+		utils.ValidationErrorResponse(c, errs)
 		return
 	}
 
-	if err := h.service.ChangePassword(userId, &req); err != nil {
+	refreshToken, refreshTtl, err := h.getTtlForRefreshToken(c)
+	if err != nil {
+		return
+	}
+
+	accessToken, accessTtl, err := h.getTtlForAccessToken(c)
+	if err != nil {
+		return
+	}
+
+	data, err := h.service.ChangePassword(userId, refreshToken, &req)
+
+	if err != nil {
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
+		return
+	}
+
+	if err := h.blacklistService.Add(c.Request.Context(), refreshToken, refreshTtl); err != nil {
+		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
+		return
+	}
+
+	if err := h.blacklistService.Add(c.Request.Context(), accessToken, accessTtl); err != nil {
 		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
 		return
 	}
 
 	h.cookieConfig.ClearAuthCookies(c)
 
-	utils.SuccessResponseWithoutBody(c, http.StatusOK, "Password successfully changed. Please log in again")
+	utils.SuccessResponse(c, http.StatusOK, "Password successfully changed", data)
 }
 
 func (h *AuthHandler) GetProfile(c *gin.Context) {
@@ -170,4 +222,60 @@ func (h *AuthHandler) CheckAuth(c *gin.Context) {
 		"authenticated": true,
 		"user":          user,
 	})
+}
+
+func (h *AuthHandler) getTtlForRefreshToken(c *gin.Context) (string, time.Duration, error) {
+	refreshToken, err := h.cookieConfig.GetRefreshToken(c)
+
+	if refreshToken == "" || err != nil {
+		utils.ErrorResponse(c,
+			utils.ErrorToHTTPStatus(utils.ErrUnauthorized),
+			utils.ErrUnauthorized.Error(),
+			utils.ErrUnauthorized,
+			utils.CodeByError(utils.ErrUnauthorized),
+		)
+		return "", 0, utils.ErrUnauthorized
+	}
+
+	claims, err := h.service.jwtMaker.ValidateRefreshToken(refreshToken)
+
+	if err != nil {
+		utils.ErrorResponse(c,
+			utils.ErrorToHTTPStatus(utils.ErrUnauthorized),
+			utils.ErrUnauthorized.Error(),
+			utils.ErrUnauthorized,
+			utils.CodeByError(utils.ErrUnauthorized),
+		)
+		return "", 0, utils.ErrUnauthorized
+	}
+
+	return refreshToken, time.Until(claims.ExpiresAt.Time), nil
+}
+
+func (h *AuthHandler) getTtlForAccessToken(c *gin.Context) (string, time.Duration, error) {
+	accessToken := c.GetString("accessToken")
+
+	if accessToken == "" {
+		utils.ErrorResponse(c,
+			utils.ErrorToHTTPStatus(utils.ErrUnauthorized),
+			utils.ErrUnauthorized.Error(),
+			utils.ErrUnauthorized,
+			utils.CodeByError(utils.ErrUnauthorized),
+		)
+		return "", 0, utils.ErrUnauthorized
+	}
+
+	claims, err := h.service.jwtMaker.ValidateAccessToken(accessToken)
+
+	if err != nil {
+		utils.ErrorResponse(c,
+			utils.ErrorToHTTPStatus(utils.ErrUnauthorized),
+			utils.ErrUnauthorized.Error(),
+			utils.ErrUnauthorized,
+			utils.CodeByError(utils.ErrUnauthorized),
+		)
+		return "", 0, utils.ErrUnauthorized
+	}
+
+	return accessToken, time.Until(claims.ExpiresAt.Time), nil
 }

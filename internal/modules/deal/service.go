@@ -40,51 +40,58 @@ func NewDealService(
 }
 
 func (s *DealService) SetNextStage(ownerId, dealId string) (*Deal, error) {
-	deal, err := s.dealRepo.FindFullById(dealId, ownerId)
+	var result *Deal
 
-	if err != nil {
-		return nil, err
-	}
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		deal, err := s.dealRepo.FindFullForUpdate(tx, dealId, ownerId)
 
-	if deal.Pipeline == nil {
-		return nil, utils.ErrNotPipeline
-	}
-
-	if deal.Pipeline.Stages == nil {
-		return nil, utils.ErrNotStages
-	}
-
-	stages := deal.Pipeline.Stages
-
-	if len(stages) == 0 {
-		return nil, utils.ErrEmptyPipeline
-	}
-
-	if deal.CurrentStageId == nil {
-		if err := s.dealRepo.SetNextStage(deal, stages[0].ID.String()); err != nil {
-			return nil, err
+		if err != nil {
+			return err
 		}
 
-		deal.CurrentStageId = &stages[0].ID
-		deal.CurrentStageName = &stages[0].Name
-		return deal, nil
-	}
-
-	for i := 0; i < len(stages); i++ {
-		if stages[i].ID.String() == deal.CurrentStageId.String() {
-			if i == len(stages)-1 {
-				return deal, utils.ErrLastStage
-			}
-			if err :=  s.dealRepo.SetNextStage(deal, stages[i+1].ID.String()); err != nil {
-				return nil, err
-			}
-			deal.CurrentStageId = &stages[i+1].ID
-			deal.CurrentStageName = &stages[i+1].Name
-			return deal, nil
+		if deal.Pipeline == nil {
+			return utils.ErrNotPipeline
 		}
-	}
 
-	return nil, utils.ErrInvalidStageId
+		if deal.Pipeline.Stages == nil {
+			return utils.ErrNotStages
+		}
+
+		stages := deal.Pipeline.Stages
+
+		if len(stages) == 0 {
+			return utils.ErrEmptyPipeline
+		}
+
+		if deal.CurrentStageId == nil {
+			deal.CurrentStageId = &stages[0].ID
+			deal.CurrentStageName = &stages[0].Name
+			if err := s.dealRepo.TransactionUpdate(tx, deal); err != nil {
+				return err
+			}
+			result = deal
+			return nil
+		}
+
+		for i := 0; i < len(stages); i++ {
+			if stages[i].ID.String() == deal.CurrentStageId.String() {
+				if i == len(stages)-1 {
+					return utils.ErrLastStage
+				}
+				deal.CurrentStageId = &stages[i+1].ID
+				deal.CurrentStageName = &stages[i+1].Name
+				if err := s.dealRepo.TransactionUpdate(tx, deal); err != nil {
+					return err
+				}
+				result = deal
+				return nil
+			}
+		}
+
+		return utils.ErrInvalidStageId
+	})
+
+	return result, err
 }
 
 func (s *DealService) FindAll(page, limit int, isFull bool) ([]Deal, int64, error) {
@@ -151,6 +158,7 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 		for index, i := range req.Pipeline.Stages {
 			stage := stage.Stage{
 				Name:       i.Name,
+				Number: index + 1,
 				PipelineID: pipeline.ID,
 			}
 
@@ -202,8 +210,11 @@ func (s *DealService) Update(req *Deal, ownerId string) error {
 	return utils.ErrNotFoundStage
 }
 
-func (s *DealService) FindDealByOwnerId(ownerId string) ([]Deal, int64, error) {
-	return s.dealRepo.FindByOwnerId(ownerId)
+func (s *DealService) FindDealByOwnerId(ownerId string, page, limit int, isFull bool, status, search string) ([]Deal, int64, error) {
+	if isFull {
+		return s.dealRepo.FindFullByOwnerId(ownerId, page, limit, status, search)
+	}
+	return s.dealRepo.FindByOwnerId(ownerId, page, limit, status, search)
 }
 
 func (s *DealService) FindDealByClientId(ownerId, clientId string) ([]Deal, int64, error) {

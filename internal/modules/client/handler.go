@@ -61,5 +61,8 @@ func (h *ClientHandler) FindListByOwnerId(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("Clients successfully found: %d", total), clients)
+	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("Clients successfully found: %d", total), &ClientWithTotal{
+		Clients: clients,
+		Total: total,
+	})
 }

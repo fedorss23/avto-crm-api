@@ -3,7 +3,9 @@ package deal
 import (
 	"avto-crm-api/internal/utils"
 	"errors"
+
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DealRepository struct {
@@ -48,6 +50,24 @@ func (r *DealRepository) FindFullById(id, ownerId string) (*Deal, error) {
 	}
 
 	return &deal, nil
+}
+
+func (r *DealRepository) FindFullForUpdate(tx *gorm.DB, id, ownerId string) (*Deal, error) {
+	var deal Deal
+	
+	err := r.db.Clauses(clause.Locking{
+		Strength: "UPDATE",
+	}).Preload("Pipeline.Stages").First(&deal, "id = ? AND owner_id = ?", id, ownerId).Error;
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.ErrRecordNotFound
+		}
+
+		return nil, err
+	}
+
+	return &deal, nil
+
 }
 
 func (r *DealRepository) TransactionUpdate(tx *gorm.DB, deal *Deal) error {
@@ -95,21 +115,54 @@ func (r *DealRepository) FindListWithAll(page, limit int) ([]Deal, int64, error)
 	return deals, total, err
 }
 
-func (r *DealRepository) FindByOwnerId(ownerID string) ([]Deal, int64, error) {
+func (r *DealRepository) FindByOwnerId(ownerID string, page, limit int, search, status string) ([]Deal, int64, error) {
 	var deals []Deal
 	var total int64
 
-	query := r.db.Where("owner_id = ?", ownerID).Order("created_at DESC")
+	offset := (page - 1) * limit
 
-	if err := query.Find(&deals).Error; err != nil {
-		return nil, 0, err
+	query := r.db.Where("owner_id = ?", ownerID)
+
+	if search != "" {
+		query = query.Where("name LIKE ?", "%"+search+"%")
+	}
+
+	if status != "" {
+		query = query.Where("status LIKE ?", "%"+status+"%")
 	}
 
 	if err := query.Count(&total).Error; err != nil {
-		return deals, 0, err
+		return nil, 0, err
 	}
 
-	return deals, total, nil
+	err := query.Offset(offset).Limit(limit).Order("created_at DESC").Find(&deals).Error
+
+	return deals, total, err
+}
+
+func (r *DealRepository) FindFullByOwnerId(ownerID string, page, limit int, search, status string) ([]Deal, int64, error) {
+	var deals []Deal
+	var total int64
+
+	offset := (page - 1) * limit
+
+	query := r.db.Where("owner_id = ?", ownerID)
+
+	if search != "" {
+		query = query.Where("name LIKE ?", "%"+search+"%")
+	}
+
+	if status != "" {
+		query = query.Where("status LIKE ?", "%"+status+"%")
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.Preload("Pipeline.Stages").Preload("Car").Preload("Client").Offset(offset).Limit(limit).Order("created_at DESC").Find(&deals).Error
+
+	return deals, total, err
 }
 
 func (r *DealRepository) FindByClientID(clientId, ownerId string) ([]Deal, int64, error) {
@@ -127,10 +180,6 @@ func (r *DealRepository) FindByClientID(clientId, ownerId string) ([]Deal, int64
 	}
 
 	return deals, total, nil
-}
-
-func (r *DealRepository) SetNextStage(deal *Deal, stageId string) error {
-	return r.db.Model(deal).Update("current_stage", stageId).Error
 }
 
 func (r *DealRepository) Delete(ownerId, dealId string) error {
