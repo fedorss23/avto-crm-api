@@ -23,7 +23,7 @@ func (h *DealHandler) FindAll(c *gin.Context) {
 	if err := utils.GetNumberQuery(c, "page", &page, 1, utils.PageErrorCode); err != nil {
 		return
 	}
-	
+
 	var limit int
 	if err := utils.GetNumberQuery(c, "limit", &limit, 10, utils.LimitErrorCode); err != nil {
 		return
@@ -59,7 +59,7 @@ func (h *DealHandler) CreateFullDeal(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs, utils.ValidationErrorCode)
+		utils.ValidationErrorResponse(c, errs)
 		return
 	}
 
@@ -81,7 +81,7 @@ func (h *DealHandler) Update(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs, utils.ValidationErrorCode)
+		utils.ValidationErrorResponse(c, errs)
 		return
 	}
 
@@ -99,7 +99,35 @@ func (h *DealHandler) FindDealsByOwnerId(c *gin.Context) {
 		return
 	}
 
-	deals, total, err := h.dealService.FindDealByOwnerId(ownerId)
+	var page int
+	if err := utils.GetNumberQuery(c, "page", &page, 1, utils.PageErrorCode); err != nil {
+		return
+	}
+
+	var limit int
+	if err := utils.GetNumberQuery(c, "limit", &limit, 10, utils.LimitErrorCode); err != nil {
+		return
+	}
+
+	var isFull bool
+	if err := utils.GetBoolQuery(c, "isFull", &isFull, false, utils.IsFullErrorCode); err != nil {
+		return
+	}
+
+	status, exists := c.GetQuery("status")
+	if exists {
+		if status != "inactive" && status != "active" && status != "completed" {
+			utils.ValidationErrorResponse(
+				c,
+				map[string]string{"status": "status must be: inactive, active or completed"},
+			)
+			return
+		}
+	}
+
+	search, exists := c.GetQuery("search")
+
+	deals, total, err := h.dealService.FindDealByOwnerId(ownerId, page, limit, isFull, status, search)
 
 	resp := DealsResponse{
 		Deals: deals,

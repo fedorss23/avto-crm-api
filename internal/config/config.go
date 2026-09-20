@@ -25,6 +25,9 @@ type Config struct {
 	Secure bool
 	JWTSecret string
 	Version string
+	RedisHost string
+	RedisPort string
+	RedisPassword string
 }
 
 func LoadConfig() *Config {
@@ -34,7 +37,7 @@ func LoadConfig() *Config {
 		log.Println("Файл .env не найден, используются стандартные настройки")
 	}
 
-	version := getEnv("version", "dev")
+	version := getEnv("VERSION", "dev")
 
 	dbport, _ := strconv.Atoi(getEnv("DB_PORT", "5432"))
 	dbmax, _ := strconv.Atoi(getEnv("DB_MAX_OPEN_CONNS", "10"))
@@ -53,6 +56,9 @@ func LoadConfig() *Config {
 		DBConnMaxLifetime: lifetime,
 		JWTSecret: getEnv("JWT_SECRET", "pass@w0rd"),
 		Version: version,
+		RedisHost: getEnv("REDIS_HOST", "redis"),
+		RedisPort: getEnv("REDIS_PORT", "6379"),
+		RedisPassword: getEnv("REDIS_PASSWORD", "redis"),
 	}
 
 	switch version {

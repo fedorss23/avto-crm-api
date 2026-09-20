@@ -17,6 +17,7 @@ var (
 
 	ErrUserNotFound       = errors.New("user not found")
 	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrUserLocked         = errors.New("user locked")
 
 	ErrNotPipeline    = errors.New("deal doesn't have pipeline")
 	ErrEmptyPipeline  = errors.New("pipeline is empty")
@@ -25,9 +26,9 @@ var (
 	ErrInvalidStageId = errors.New("invalid stage")
 	ErrLastStage      = errors.New("deal has last stage")
 
-	ErrEmailAlredyExists = errors.New("email already exists")
-	ErrInvalidRefreshToken = errors.New("invalid refresh token")
-	ErrPasswordIncorrectLogin = errors.New("invalid password")
+	ErrEmailAlredyExists         = errors.New("email already exists")
+	ErrInvalidRefreshToken       = errors.New("invalid refresh token")
+	ErrPasswordIncorrectLogin    = errors.New("invalid password")
 	ErrPasswordIncorrectRegister = errors.New("invalid password")
 )
 
@@ -41,7 +42,8 @@ const (
 	RecordNotFoundCode  = "RECORD_NOT_FOUND"
 	ValidationErrorCode = "VALIDATION_ERROR"
 	ConflictCode        = "CONFLICT"
-	CredentialsCode = "INVALID_CREDENTIALS"
+	CredentialsCode     = "INVALID_CREDENTIALS"
+	UserLockedCode      = "USER_LOCKED"
 
 	DealPipelineNotFoundCode    = "DEAL_PIPELINE_NOT_FOUND"
 	DealPipelineEmptyCode       = "PIPELINE_EMPTY"
@@ -94,21 +96,23 @@ func CodeByError(err error) string {
 	case errors.Is(err, ErrPasswordIncorrectLogin), errors.Is(err, ErrPasswordIncorrectRegister):
 		return CredentialsCode
 
+	case errors.Is(err, ErrUserLocked):
+		return UserLockedCode
+
 	default:
 		return InternalErrorCode
 	}
 }
 
-
 func ErrorToHTTPStatus(err error) int {
 	switch {
 	case errors.Is(err, ErrUnauthorized),
 		errors.Is(err, ErrInvalidCredentials),
-		errors.Is(err, ErrInvalidRefreshToken),
-		errors.Is(err, ErrPasswordIncorrectLogin):
+		errors.Is(err, ErrInvalidRefreshToken):
 		return http.StatusUnauthorized
 
-	case errors.Is(err, ErrForbidden):
+	case errors.Is(err, ErrForbidden),
+		errors.Is(err, ErrUserLocked):
 		return http.StatusForbidden
 
 	case errors.Is(err, ErrRecordNotFound),
@@ -116,7 +120,10 @@ func ErrorToHTTPStatus(err error) int {
 		errors.Is(err, ErrNotFoundStage):
 		return http.StatusNotFound
 
-	case errors.Is(err, ErrInvalidStageId), errors.Is(err, ErrPasswordIncorrectRegister), errors.Is(err, ErrEmailAlredyExists):
+	case errors.Is(err, ErrInvalidStageId),
+		errors.Is(err, ErrPasswordIncorrectRegister),
+		errors.Is(err, ErrEmailAlredyExists),
+		errors.Is(err, ErrPasswordIncorrectLogin):
 		return http.StatusBadRequest
 
 	case errors.Is(err, ErrNotPipeline),

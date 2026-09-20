@@ -22,7 +22,7 @@ func (h *CarHandler) Create(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs, utils.ValidationErrorCode)
+		utils.ValidationErrorResponse(c, errs)
 		return
 	}
 
@@ -63,7 +63,7 @@ func (h *CarHandler) Update(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs, utils.ValidationErrorCode)
+		utils.ValidationErrorResponse(c, errs)
 		return
 	}
 

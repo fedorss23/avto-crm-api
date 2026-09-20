@@ -26,7 +26,7 @@ func GetParam(c *gin.Context, name string, cont *string) error {
 	if param == "" {
 		errs := make(map[string]string)
 		errs[name] = "param required"
-		ValidationErrorResponse(c, errs, ValidationErrorCode)
+		ValidationErrorResponse(c, errs)
 		return ToParamError(name)
 	}
 
@@ -89,7 +89,6 @@ func GetStringRequiredQuery(c *gin.Context, name string, cont *string) error {
 		ValidationErrorResponse(
 			c,
 			err,
-			ValidationErrorCode,
 		)
 		return ToQueryErrorWithType(name, "string")
 	}

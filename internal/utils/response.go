@@ -57,20 +57,20 @@ func ErrorResponse(c *gin.Context, statusCode int, message string, err error, co
 	c.JSON(statusCode, APIResponse{
 		Success: false,
 		Message: message,
-		Error: ErrorResponseData{
+		Data: ErrorResponseData{
 			Err: err.Error(),
 			Code: code,
 		},
 	})
 }
 
-func ValidationErrorResponse(c *gin.Context, errors map[string]string, code string) {
+func ValidationErrorResponse(c *gin.Context, errors map[string]string) {
 	c.JSON(400, APIResponse{
 		Success: false,
 		Message: "Ошибка валидации",
-		Error: ValidationErrorResponseData{
+		Data: ValidationErrorResponseData{
 			Err: errors,
-			Code: code,
+			Code: ValidationErrorCode,
 		},
 	})
 }

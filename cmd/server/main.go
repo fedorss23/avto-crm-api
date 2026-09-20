@@ -1,6 +1,7 @@
 package main
 
 import (
+	"avto-crm-api/internal/blacklist"
 	"avto-crm-api/internal/config"
 	"avto-crm-api/internal/database"
 	"avto-crm-api/internal/modules/auth"
@@ -10,6 +11,7 @@ import (
 	"avto-crm-api/internal/modules/pipeline"
 	"avto-crm-api/internal/modules/stage"
 	"avto-crm-api/internal/modules/user"
+	"avto-crm-api/internal/rdb"
 	"avto-crm-api/pkg/cookie"
 	"avto-crm-api/pkg/jwt"
 	"avto-crm-api/pkg/middleware"
@@ -58,6 +60,11 @@ func main() {
 		log.Fatalf("Error with connecting to database")
 	}
 
+	rdbClient := rdb.NewRedisClient(cfg.RedisHost + ":" + cfg.RedisPort, cfg.RedisPassword, 0)
+
+
+	blacklist := blacklist.NewBlacklistService(rdbClient)
+
 	userRepo := user.NewUserRepository(db)
 	dealRepo := deal.NewDealRepository(db)
 	carRepo := car.NewCarRepository(db)
@@ -65,7 +72,7 @@ func main() {
 	stageRepo := stage.NewStageRepository()
 	pipelineRepo := pipeline.NewPipelineRepository()
 
-	authService := auth.NewAuthService(userRepo, jwtMaker, serviceConfig)
+	authService := auth.NewAuthService(userRepo, jwtMaker, serviceConfig, db)
 	dealService := deal.NewDealService(db, dealRepo, carRepo, pipelineRepo, stageRepo, clientRepo)
 	carService := car.NewCarService(carRepo)
 	clientSerivce := client.NewClientService(clientRepo)
@@ -74,7 +81,7 @@ func main() {
 
 	cookieConfig := cookie.NewCookieConfig(cfg.Domain, cfg.Secure)
 
-	authHandler := auth.NewAuthHandler(authService, cookieConfig)
+	authHandler := auth.NewAuthHandler(authService, cookieConfig, blacklist)
 	dealHandler := deal.NewDealHandler(dealService)
 	carHandler := car.NewCarHandler(carService)
 	clientHandler := client.NewClientHandler(clientSerivce)
@@ -89,6 +96,25 @@ func main() {
 		})
 	})
 
+	router.GET("/redis-check", func(c *gin.Context) {
+		err := rdbClient.Ping(c.Request.Context())
+
+		if err != nil {
+			c.JSON(500, gin.H{
+				"status": "error",
+				"time": time.Now().Format(time.RFC3339),
+				"error": err.Error(),
+			})
+			return
+		}
+
+		c.JSON(200, gin.H{
+			"status": "ok",
+			"time": time.Now().Format(time.RFC3339),
+			"message": "pong",
+		})
+	})
+
 	api := router.Group("/api/v1")
 	{
 		auth := api.Group("/auth")
@@ -99,16 +125,16 @@ func main() {
 			auth.POST("/refresh-tokens", authHandler.Refresh)
 
 			aauth := auth.Group("")
-			aauth.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+			aauth.Use(middleware.AuthMiddleware(cfg.JWTSecret, blacklist.IsBlacklisted))
 			{
+				aauth.POST("/logout", authHandler.Logout)
 				aauth.GET("/profile", authHandler.GetProfile)
 				aauth.POST("/change-password", authHandler.ChangePassword)
-				aauth.POST("/logout", authHandler.Logout)
 			}
 		}
 
 		deal := api.Group("/deal")
-		deal.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+		deal.Use(middleware.AuthMiddleware(cfg.JWTSecret, blacklist.IsBlacklisted))
 		{
 			deal.GET("", dealHandler.FindAll)
 			deal.GET("/by-owner", dealHandler.FindDealsByOwnerId)
@@ -130,19 +156,20 @@ func main() {
 		}
 
 		client := api.Group("/client")
-		client.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+		client.Use(middleware.AuthMiddleware(cfg.JWTSecret, blacklist.IsBlacklisted))
 		{
 			client.GET(":clientId", clientHandler.FindById)
+			client.GET("/by-owner", clientHandler.FindListByOwnerId)
 		}
 
 		pipeline := api.Group("/pipeline")
-		pipeline.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+		pipeline.Use(middleware.AuthMiddleware(cfg.JWTSecret, blacklist.IsBlacklisted))
 		{
 			pipeline.GET("", pipelineHandler.FindList)
 		}
 
 		users := api.Group("/users")
-		users.Use(middleware.AdminMiddleware(cfg.JWTSecret))
+		users.Use(middleware.AdminMiddleware(cfg.JWTSecret, blacklist.IsBlacklisted))
 		{
 			users.GET("", userHandler.FindList)
 			users.DELETE(":userId", userHandler.Delete)

@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"avto-crm-api/internal/utils"
+	"context"
 	"net/http"
 	"strings"
 
@@ -15,7 +17,15 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func AuthMiddleware(secret string) gin.HandlerFunc {
+type APIResponse struct {
+	Success bool `json:"success"`
+	Message string `json:"message"`
+	Data interface{} `json:"data,omitempty"`
+	Error interface{} `json:"error,omitempty"`
+	Meta interface{} `json:"meta,omitempty"`
+}
+
+func AuthMiddleware(secret string, isBlacklist func(ctx context.Context, token string) (bool, error)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 
@@ -25,8 +35,10 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 		}
 
 		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "missing authorization header",
+			c.AbortWithStatusJSON(http.StatusUnauthorized, APIResponse{
+				Success: true,
+				Message: "not authorized",
+				Error: utils.ErrUnauthorized,
 			})
 			return
 		}
@@ -34,13 +46,15 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 		parts := strings.Split(authHeader, " ")
 
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid authorization header",
+			c.AbortWithStatusJSON(http.StatusUnauthorized, APIResponse{
+				Success: true,
+				Message: "invalid authorized header",
+				Error: utils.ErrUnauthorized,
 			})
 			return
 		}
 
-		tokenString := parts[1]
+		tokenString := strings.TrimSpace(parts[1])
 
 		token, err := jwt.ParseWithClaims(
 			tokenString,
@@ -51,16 +65,40 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 		)
 
 		if err != nil || !token.Valid {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid token",
+			c.AbortWithStatusJSON(http.StatusUnauthorized, APIResponse{
+				Success: true,
+				Message: "invalid token",
+				Error: utils.ErrUnauthorized,
 			})
 			return
 		}
 
+		// tokenOk, err := isBlacklist(c.Request.Context(), tokenString)
+
+		// if err != nil {
+		// 	c.AbortWithStatusJSON(http.StatusInternalServerError, APIResponse{
+		// 		Success: true,
+		// 		Message: err.Error(),
+		// 		Error: err,
+		// 	})
+		// 	return
+		// }
+
+		// if tokenOk {
+		// 	c.AbortWithStatusJSON(http.StatusUnauthorized, APIResponse{
+		// 		Success: true,
+		// 		Message: "not authorized",
+		// 		Error: utils.ErrUnauthorized,
+		// 	})
+		// 	return
+		// }
+
 		claims, ok := token.Claims.(*Claims)
 		if !ok || claims.UserID == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid claims",
+			c.AbortWithStatusJSON(http.StatusUnauthorized, APIResponse{
+				Success: true,
+				Message: "invalid claims",
+				Error: utils.ErrUnauthorized,
 			})
 			return
 		}
@@ -68,47 +106,86 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 		c.Set("userId", claims.UserID)
 		c.Set("email", claims.Email)
 		c.Set("role", claims.Role)
+		c.Set("token", token)
 
 		c.Next()
 	}
 }
 
-func AdminMiddleware(secret string) gin.HandlerFunc {
+func AdminMiddleware(secret string, isBlacklist func(ctx context.Context, token string) (bool, error)) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
+		authHeader := c.GetHeader("Authorization")
 
-		if header == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "no authorized",
+		if c.Request.Method == http.MethodOptions {
+			c.Next()
+			return
+		}
+
+		if authHeader == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, APIResponse{
+				Success: true,
+				Message: "not authorized",
+				Error: utils.ErrUnauthorized,
 			})
 			return
 		}
 
-		parts := strings.Split(header, " ")
+		parts := strings.Split(authHeader, " ")
 
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid token",
+			c.AbortWithStatusJSON(http.StatusUnauthorized, APIResponse{
+				Success: true,
+				Message: "invalid authorized header",
+				Error: utils.ErrUnauthorized,
 			})
 			return
 		}
 
-		token, err := jwt.ParseWithClaims(parts[1], &Claims{},
+		tokenString := strings.TrimSpace(parts[1])
+
+		token, err := jwt.ParseWithClaims(
+			tokenString,
+			&Claims{},
 			func(t *jwt.Token) (interface{}, error) {
 				return []byte(secret), nil
-			})
+			},
+		)
 
 		if err != nil || !token.Valid {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid token",
+			c.AbortWithStatusJSON(http.StatusUnauthorized, APIResponse{
+				Success: true,
+				Message: "invalid token",
+				Error: utils.ErrUnauthorized,
 			})
 			return
 		}
 
-		claims, ok := token.Claims.(Claims)
+		tokenOk, err := isBlacklist(c.Request.Context(), tokenString)
+
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, APIResponse{
+				Success: true,
+				Message: err.Error(),
+				Error: err,
+			})
+			return
+		}
+
+		if tokenOk {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, APIResponse{
+				Success: true,
+				Message: "not authorized",
+				Error: utils.ErrUnauthorized,
+			})
+			return
+		}
+
+		claims, ok := token.Claims.(*Claims)
 		if !ok || claims.UserID == "" || claims.Role != "admin" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid claims",
+			c.AbortWithStatusJSON(http.StatusUnauthorized, APIResponse{
+				Success: true,
+				Message: "invalid claims",
+				Error: utils.ErrUnauthorized,
 			})
 			return
 		}
@@ -116,6 +193,7 @@ func AdminMiddleware(secret string) gin.HandlerFunc {
 		c.Set("userId", claims.UserID)
 		c.Set("email", claims.Email)
 		c.Set("role", claims.Role)
+		c.Set("token", token)
 
 		c.Next()
 	}

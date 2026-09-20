@@ -5,6 +5,9 @@ import (
 	"avto-crm-api/internal/utils"
 	"avto-crm-api/pkg/jwt"
 	"time"
+
+	"gorm.io/gorm"
+	"errors"
 )
 
 type Config struct {
@@ -18,19 +21,26 @@ type AuthService struct {
 	userRepo *user.UserRepository
 	jwtMaker *jwt.JWTMaker
 	config *Config
+	db *gorm.DB
 }
 
-func NewAuthService(userRepo *user.UserRepository, jwtMaker *jwt.JWTMaker, cfg *Config) *AuthService {
+func NewAuthService(
+	userRepo *user.UserRepository, 
+	jwtMaker *jwt.JWTMaker, 
+	cfg *Config, 
+	db *gorm.DB,
+) *AuthService {
 	return &AuthService{
 		userRepo: userRepo,
 		jwtMaker: jwtMaker,
 		config: cfg,
+		db: db,
 	}
 }
 
 func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 	existingUser, err := s.userRepo.FindByEmail(req.Email)
-	if err != nil {
+	if err != nil && !errors.Is(err, utils.ErrRecordNotFound){
 		return nil, err
 	}
 
@@ -69,8 +79,6 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 	return &AuthResponse{
 		AccessToken: tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
-		TokenType: "Bearer",
-		ExpiresIn: int64(s.config.AccessTokenDuration.Seconds()),
 		User: *s.toUserResponse(user),
 	}, nil
 }
@@ -85,13 +93,14 @@ func (s *AuthService) Login(req *LoginRequest, ip string) (*LoginResult, error) 
 		return nil, utils.ErrInvalidCredentials
 	}
 
-	// if err := s.isLocked(user); err != nil {
-	// 	return nil, ErrUserLocked
-	// }
+	if user.IsLocked {
+		return nil, utils.ErrUserLocked
+	}
 
 	match, err := utils.Verify(req.Password, user.Password) 
 
 	if err != nil || !match {
+		
 		return  nil, utils.ErrPasswordIncorrectLogin
 	}
 
@@ -115,8 +124,6 @@ func (s *AuthService) Login(req *LoginRequest, ip string) (*LoginResult, error) 
 }
 
 func (s *AuthService) RefreshToken(refreshToken string) (*RefreshResult, error) {
-	// добавление в blacklist в будущем, интеграция с redis
-
 	claims, err := s.jwtMaker.ValidateRefreshToken(refreshToken)
 
 	if err != nil {
@@ -148,32 +155,50 @@ func (s *AuthService) RefreshToken(refreshToken string) (*RefreshResult, error) 
 
 // }
 
-func (s *AuthService) ChangePassword(userID string, req *ChangePasswordRequest) error {
-	user, err := s.userRepo.FindById(userID)
-	if err != nil || user == nil {
-		return err
-	}
+func (s *AuthService) ChangePassword(userID, refreshToken string, req *ChangePasswordRequest) (*AuthResponse, error) {
+	var tokens *RefreshResult
 
-	match, err := utils.Verify(req.OldPassword, user.Password)
+	err := s.db.Transaction(func(tx *gorm.DB) error { 
+		user, err := s.userRepo.FindByIdWithTx(tx, userID)
+		if err != nil || user == nil {
+			return err
+		}
 
-	if err != nil || !match {
-		return utils.ErrPasswordIncorrectRegister
-	}
+		match, err := utils.Verify(req.OldPassword, user.Password)
 
-	hashPassword, err := utils.Hash(req.NewPassword)
+		if err != nil || !match {
+			return utils.ErrPasswordIncorrectRegister
+		}
+
+		hashPassword, err := utils.Hash(req.NewPassword)
+		if err != nil {
+			return err
+		}
+
+		user.Password = hashPassword
+
+		if err := s.userRepo.UpdateWithTx(tx, user); err != nil {
+			return err
+		}
+
+		tokens, err = s.RefreshToken(refreshToken)
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	user.Password = hashPassword
-
-	if err := s.userRepo.Update(user); err != nil {
-		return err
-	}
-
-	//добавление токена в blacklist
-
-	return nil
+	return &AuthResponse{
+		User: tokens.User,
+		RefreshToken: tokens.RefreshToken,
+		AccessToken: tokens.AccessToken,
+	}, nil
 }
 
 func (s *AuthService) GetProfile(userID string) (*UserResponse, error) {
@@ -217,28 +242,21 @@ func (s *AuthService) toUserResponse(user *user.User) *UserResponse {
 	}
 }
 
-// func (s *AuthService) isLocked(user *user.User) error {
-// 	if !user.IsActive {
-// 		return ErrUserInactive
-// 	}
+func (s AuthService) LockUser(userId string) error {
+	user, err := s.userRepo.FindById(userId)
 
-// 	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
-// 		return ErrUserLocked
-// 	} 
+	if err != nil {
+		return err
+	}
 
-// 	return nil
-// }
+	user.IsLocked = true
 
-// func (s *AuthService) handleFailedLogin(user *user.User) error {
-// 	user.LoginAttempts++
+	if err := s.userRepo.Update(user); err != nil {
+		return err
+	}
 
-// 	if user.LoginAttempts >= s.config.MaxLoginAttempts {
-// 		lockedUntil := time.Now().Add(s.config.LockDuration)
-// 		user.LockedUntil = &lockedUntil
-// 	}
-
-// 	return s.userRepo.Update(user)
-// }
+	return nil
+}
 
 // func (s *AuthService) resetLoginAttempts(userID uuid.UUID) error {
 // 	return s.userRepo.ResetLoginAttempts(userID)

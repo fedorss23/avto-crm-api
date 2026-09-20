@@ -24,6 +24,8 @@ type User struct {
 	Deals []deal.Deal `gorm:"foreignKey:OwnerID" json:"deals"`
 	Clients []client.Client `gorm:"foreignKey:OwnerID" json:"clients"`
 
+	IsLocked bool `gorm:"default:false" json:"isLocked"`
+
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"updatedAt"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`

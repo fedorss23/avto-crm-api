@@ -13,6 +13,7 @@ type Stage struct {
 
 	PipelineID uuid.UUID `json:"pipelineId"`
 
+	Number int `json:"number"`
 	Description *string `json:"description"`
 
 	CreatedAt time.Time      `json:"createdAt"`
