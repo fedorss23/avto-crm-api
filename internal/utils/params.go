@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -52,6 +53,17 @@ func GetNumberQuery(c *gin.Context, name string, cont *int, defaultval int, code
 			)
 			return ToQueryErrorWithType(name, "number")
 		}
+
+		if a <= 0 {
+			ErrorResponse(
+				c,
+				http.StatusBadRequest,
+				fmt.Sprintf("%s must be > 0", name),
+				errors.New("invalid query param"),
+				code,
+			)
+			return ToQueryErrorWithType(name, "number")
+		}
 		*cont = a
 	}
 
@@ -84,7 +96,7 @@ func GetBoolQuery(c *gin.Context, name string, cont *bool, defaultval bool, code
 func GetStringRequiredQuery(c *gin.Context, name string, cont *string) error {
 	param, exists := c.GetQuery(name)
 	if !exists {
-		var err map[string]string
+		err := make(map[string]string)
 		err[name] = "query-param required"
 		ValidationErrorResponse(
 			c,
