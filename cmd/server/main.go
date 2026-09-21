@@ -136,17 +136,12 @@ func main() {
 		deal := api.Group("/deal")
 		deal.Use(middleware.AuthMiddleware(cfg.JWTSecret, blacklist.IsBlacklisted))
 		{
-			deal.GET("", dealHandler.FindAll)
-			deal.GET("/by-owner", dealHandler.FindDealsByOwnerId)
-			deal.GET("/by-client/:clientId", dealHandler.FindDealByClientId)
+			deal.GET("", dealHandler.FindList)
+			deal.GET("/total", dealHandler.GetTotalByStatus)
 			deal.POST("", dealHandler.CreateFullDeal)
-			deal.PUT("", dealHandler.Update)
-			deal.POST("/:dealId/next-stage", dealHandler.SetNextStage)
+			deal.PUT("/:dealId", dealHandler.Update)
 			deal.DELETE("/:dealId", dealHandler.Delete)
-			deal.GET("/by-id/:dealId", dealHandler.FindById)
-			deal.POST("/cancel/:dealId", dealHandler.CancelDeal)
-			deal.POST("/avtivate/:dealId", dealHandler.ActiveDeal)
-			deal.POST("/change-stage/:dealId", dealHandler.ChangeStage)
+			deal.GET("/:dealId", dealHandler.FindById)
 		}
 
 		car := api.Group("/car")

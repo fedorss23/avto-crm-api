@@ -39,112 +39,62 @@ func NewDealService(
 	}
 }
 
-func (s *DealService) SetNextStage(ownerId, dealId string) (*Deal, error) {
-	var result *Deal
+func (s *DealService) GetTotalByStatus(ownerId string, status string) (int64, error) {
+	return s.dealRepo.GetTotalForStatus(ownerId, status)
+}
 
+func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) (*Deal, error) {
+	var deal *Deal
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		deal, err := s.dealRepo.FindFullForUpdate(tx, dealId, ownerId)
-
+		oid, err := uuid.Parse(ownerId)
 		if err != nil {
 			return err
 		}
 
-		if deal.Pipeline == nil {
-			return utils.ErrNotPipeline
+		if len(req.Pipeline.Stages) == 0 {
+			return utils.ErrNotFoundStage
 		}
 
-		if deal.Pipeline.Stages == nil {
-			return utils.ErrNotStages
-		}
-
-		stages := deal.Pipeline.Stages
-
-		if len(stages) == 0 {
-			return utils.ErrEmptyPipeline
-		}
-
-		if deal.CurrentStageId == nil {
-			deal.CurrentStageId = &stages[0].ID
-			deal.CurrentStageName = &stages[0].Name
-			if err := s.dealRepo.TransactionUpdate(tx, deal); err != nil {
-				return err
-			}
-			result = deal
-			return nil
-		}
-
-		for i := 0; i < len(stages); i++ {
-			if stages[i].ID.String() == deal.CurrentStageId.String() {
-				if i == len(stages)-1 {
-					return utils.ErrLastStage
-				}
-				deal.CurrentStageId = &stages[i+1].ID
-				deal.CurrentStageName = &stages[i+1].Name
-				if err := s.dealRepo.TransactionUpdate(tx, deal); err != nil {
-					return err
-				}
-				result = deal
-				return nil
-			}
-		}
-
-		return utils.ErrInvalidStageId
-	})
-
-	return result, err
-}
-
-func (s *DealService) FindAll(page, limit int, isFull bool) ([]Deal, int64, error) {
-	if isFull {
-		return s.dealRepo.FindListWithAll(page, limit)
-	} else {
-		return s.dealRepo.FindList(page, limit)
-	}
-}
-
-func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		pipeline := &pipeline.Pipeline{
+		newPipeline := &pipeline.Pipeline{
 			Name:        req.Pipeline.Name,
 			Source:      req.Pipeline.Source,
 			Destination: req.Pipeline.Destination,
 		}
 
-		car := &car.Car{
-			Model: req.Car.Model,
+		for index, st := range req.Pipeline.Stages {
+			stg := stage.Stage{
+				Name:   st.Name,
+				Number: index + 1,
+			}
+			if st.Description != "" {
+				stg.Description = &st.Description
+			}
+			newPipeline.Stages = append(newPipeline.Stages, stg)
 		}
 
-		oid, err := uuid.Parse(ownerId)
+		newCar := &car.Car{Model: req.Car.Model}
 
-		if err != nil {
-			return err
-		}
-
-		client := &client.Client{
+		newClient := &client.Client{
 			Name:    req.Client.Name,
 			OwnerID: oid,
 		}
 
 		if req.Client.Email != nil {
-			client.Email = req.Client.Email
+			newClient.Email = req.Client.Email
 		}
 
 		if req.Client.Phone != nil {
-			client.Phone = req.Client.Phone
+			newClient.Phone = req.Client.Phone
 		}
 
-		now := time.Now()
-
-		dueDate := now.AddDate(0, 0, req.Term)
-
-		deal := &Deal{
+		deal = &Deal{
 			Name:     req.Name,
-			Pipeline: pipeline,
+			Pipeline: newPipeline,
+			Client:   newClient,
+			Car:      newCar,
 			OwnerID:  oid,
-			Car:      car,
-			Client:   client,
 			Term:     req.Term,
-			DueDate:  dueDate,
+			DueDate:  time.Now().AddDate(0, 0, req.Term),
 			Total:    req.Total,
 		}
 
@@ -152,132 +102,90 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 			return err
 		}
 
-		var firstStageID uuid.UUID
-		var currentStageName string
+		firstStage := deal.Pipeline.Stages[0]
 
-		for index, i := range req.Pipeline.Stages {
-			stage := stage.Stage{
-				Name:       i.Name,
-				Number: index + 1,
-				PipelineID: pipeline.ID,
+		return tx.Model(deal).Updates(map[string]interface{}{
+			"current_stage_id":   &firstStage.ID,
+			"current_stage_name": &firstStage.Name,
+		}).Error
+	})
+
+	return deal, err
+}
+
+func (s *DealService) Update(req *UpdateDealRequest, ownerId string, dealId string) (*Deal, error) {
+	var deal *Deal
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		deal, err = s.dealRepo.FindFullForUpdate(tx, dealId, ownerId)
+
+		if err != nil {
+			return err
+		}
+
+		updateMap := make(map[string]interface{})
+
+		if req.Name != nil {
+			updateMap["name"] = *req.Name
+		}
+
+		if req.Status != nil {
+			updateMap["status"] = *req.Status
+		}
+
+		if req.DueDate != nil {
+			parseDate, err := time.Parse("01-02-2006", *req.DueDate)
+			if err != nil {
+				return err
 			}
+			updateMap["due_date"] = parseDate
+		}
 
-			if i.Description != "" {
-				stage.Description = &i.Description
-			}
+		if req.Term != nil {
+			updateMap["term"] = *req.Term
+		}
 
-			if err := s.stageRepo.Create(tx, &stage); err != nil {
+		if req.Total != nil {
+			updateMap["total"] = *req.Total
+		}
+
+		if req.CurrentStageId != nil {
+			parseId, err := uuid.Parse(*req.CurrentStageId)
+			if err != nil {
 				return err
 			}
 
-			if index == 0 {
-				firstStageID = stage.ID
-				currentStageName = stage.Name
+			isFound := false
+
+			for _, i := range deal.Pipeline.Stages {
+				if i.ID == parseId {
+					stage := i
+					updateMap["current_stage_id"] = parseId
+					updateMap["current_stage_name"] = stage.Name
+					isFound = true
+					break
+				}
+			}
+
+			if !isFound {
+				return utils.ErrNotFoundStage
 			}
 		}
 
-		deal.PipelineId = &pipeline.ID
-		deal.ClientId = &client.ID
-		deal.CarId = &car.ID
-		deal.CurrentStageId = &firstStageID
-		deal.CurrentStageName = &currentStageName
-
-		return s.dealRepo.TransactionUpdate(tx, deal)
+		return tx.Model(deal).Updates(updateMap).Error
 	})
+
+	return deal, err
 }
 
-func (s *DealService) Update(req *Deal, ownerId string) error {
-	if req.OwnerID.String() != ownerId {
-		return utils.ErrForbidden
-	}
-
-	_, err := s.dealRepo.FindById(req.ID.String(), ownerId)
-	if err != nil {
-		return err
-	}
-
-	if req.CurrentStageId == nil {
-		return utils.ErrInvalidStageId
-	}
-
-	for _, i := range req.Pipeline.Stages {
-		if i.ID == *req.CurrentStageId {
-			req.CurrentStageName = &i.Name
-			return s.dealRepo.Update(req)
-		}
-	}
-
-	return utils.ErrNotFoundStage
-}
-
-func (s *DealService) FindDealByOwnerId(ownerId string, page, limit int, isFull bool, status, search string) ([]Deal, int64, error) {
-	if isFull {
-		return s.dealRepo.FindFullByOwnerId(ownerId, page, limit, status, search)
-	}
-	return s.dealRepo.FindByOwnerId(ownerId, page, limit, status, search)
-}
-
-func (s *DealService) FindDealByClientId(ownerId, clientId string) ([]Deal, int64, error) {
-	return s.dealRepo.FindByClientID(clientId, ownerId)
+func (s *DealService) FindDealByOwnerId(filters *DealFilters) ([]Deal, int64, error) {
+	return s.dealRepo.FindList(filters)
 }
 
 func (s *DealService) Delete(ownerId, dealId string) error {
 	return s.dealRepo.Delete(ownerId, dealId)
 }
 
-func (s *DealService) FindById(ownerId, dealId string, isFull bool) (*Deal, error) {
-	if isFull {
-		return s.dealRepo.FindFullById(dealId, ownerId)
-	} else {
-		return s.dealRepo.FindById(dealId, ownerId)
-	}
-}
-
-func (s *DealService) ChangeStatus(ownerId, dealId, status string) error {
-	deal, err := s.dealRepo.FindById(dealId, ownerId)
-
-	if err != nil {
-		return err
-	}
-
-	deal.Status = status
-
-	return s.dealRepo.Update(deal)
-}
-
-func (s *DealService) ChangeStage(ownerId, dealId, stageId string) error {
-	deal, err := s.dealRepo.FindFullById(dealId, ownerId)
-	if err != nil {
-		return err
-	}
-
-	parsedId, err := uuid.Parse(stageId)
-
-	if err != nil {
-		return utils.ErrInvalidStageId
-	}
-
-	if deal.Pipeline == nil {
-		return utils.ErrNotPipeline
-	}
-
-	if deal.Pipeline.Stages == nil {
-		return utils.ErrNotStages
-	}
-
-	stages := deal.Pipeline.Stages
-
-	if len(stages) == 0 {
-		return utils.ErrEmptyPipeline
-	}
-
-	for _, i := range deal.Pipeline.Stages {
-		if i.ID == parsedId {
-			deal.CurrentStageId = &parsedId
-			deal.CurrentStageName = &i.Name
-			return s.dealRepo.Update(deal)
-		}
-	}
-
-	return utils.ErrNotFoundStage
+func (s *DealService) FindById(dealId, ownerId string, isFull bool) (*Deal, error) {
+	return s.dealRepo.FindById(dealId, ownerId, isFull)
 }

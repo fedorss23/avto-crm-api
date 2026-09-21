@@ -15,19 +15,19 @@ type Deal struct {
 	Name string    `gorm:"not null" json:"name"`
 	Status string `gorm:"default:'active'" json:"status"`
 
-	Pipeline   *pipeline.Pipeline `gorm:"not null" json:"pipeline"`
-	PipelineId *uuid.UUID `json:"pipelineId"`
+	Pipeline   *pipeline.Pipeline `gorm:"not null;foreignKey:PipelineID" json:"pipeline"`
+	PipelineID *uuid.UUID `json:"pipelineId"`
 
 	CurrentStageId *uuid.UUID `json:"currentStage"`
 	CurrentStageName *string `json:"currentStageName"`
 
-	Car *car.Car `gorm:"not null" json:"car"`
-	CarId *uuid.UUID `json:"carId"`
+	Car *car.Car `gorm:"not null;foreignKey:CarID" json:"car"`
+	CarID *uuid.UUID `json:"carId"`
 
 	OwnerID  uuid.UUID `gorm:"not null" json:"ownerId"`
 
-	Client *client.Client `gorm:"not null" json:"client"`
-	ClientId *uuid.UUID `json:"clientId"`
+	Client *client.Client `gorm:"not null;foreignKey:ClientID" json:"client"`
+	ClientID *uuid.UUID `json:"clientId"`
 
 	DueDate time.Time `gorm:"not null" json:"dueDate"`
 	Term int `gorm:"not null" json:"term"`
