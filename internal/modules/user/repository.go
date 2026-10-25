@@ -68,8 +68,8 @@ func (r *UserRepository) Update(user *User) error {
 	return r.db.Save(user).Error
 }
 
-func (r *UserRepository) Delete(id, ownerId string) error {
-	result := r.db.Delete(&User{}, "id = ? AND owner_id = ?", id, ownerId)
+func (r *UserRepository) Delete(id string) error {
+	result := r.db.Delete(&User{}, "id = ?", id)
 
 	if result.Error != nil {
 		return result.Error

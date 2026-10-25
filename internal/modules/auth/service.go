@@ -6,8 +6,9 @@ import (
 	"avto-crm-api/pkg/jwt"
 	"time"
 
-	"gorm.io/gorm"
 	"errors"
+
+	"gorm.io/gorm"
 )
 
 type Config struct {
@@ -62,8 +63,8 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 		Email: req.Email,
 		Password: string(hash),
 		Name: req.Name,
+		MiddleName: req.MiddleName,
 		LastName: req.LastName,
-		Role: "user",
 	}
 
 	if err := s.userRepo.Create(user); err != nil {
@@ -83,9 +84,12 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 	}, nil
 }
 
-func (s *AuthService) Login(req *LoginRequest, ip string) (*LoginResult, error) {
+func (s *AuthService) Login(req *LoginRequest, ip string) (*AuthResponse, error) {
 	user, err := s.userRepo.FindByEmail(req.Email)
 	if err != nil {
+		if errors.Is(err, utils.ErrRecordNotFound) {
+			return nil, utils.ErrInvalidCredentials
+		}
 		return nil, err
 	}
 
@@ -100,8 +104,7 @@ func (s *AuthService) Login(req *LoginRequest, ip string) (*LoginResult, error) 
 	match, err := utils.Verify(req.Password, user.Password) 
 
 	if err != nil || !match {
-		
-		return  nil, utils.ErrPasswordIncorrectLogin
+		return  nil, utils.ErrInvalidCredentials
 	}
 
 	// s.resetLoginAttempts(user.ID)
@@ -116,14 +119,14 @@ func (s *AuthService) Login(req *LoginRequest, ip string) (*LoginResult, error) 
 		return nil, err
 	}
 
-	return &LoginResult{
+	return &AuthResponse{
 		User: *s.toUserResponse(user),
 		AccessToken: tokenResponse.AccessToken,
 		RefreshToken: tokenResponse.RefreshToken,
 	}, nil
 }
 
-func (s *AuthService) RefreshToken(refreshToken string) (*RefreshResult, error) {
+func (s *AuthService) RefreshToken(refreshToken string) (*AuthResponse, error) {
 	claims, err := s.jwtMaker.ValidateRefreshToken(refreshToken)
 
 	if err != nil {
@@ -142,7 +145,7 @@ func (s *AuthService) RefreshToken(refreshToken string) (*RefreshResult, error) 
 		return nil, err
 	}
 
-	return &RefreshResult{
+	return &AuthResponse{
 		User: *s.toUserResponse(user),
 		AccessToken: tokenResponse.AccessToken,
 		RefreshToken: tokenResponse.RefreshToken,
@@ -156,7 +159,7 @@ func (s *AuthService) RefreshToken(refreshToken string) (*RefreshResult, error) 
 // }
 
 func (s *AuthService) ChangePassword(userID, refreshToken string, req *ChangePasswordRequest) (*AuthResponse, error) {
-	var tokens *RefreshResult
+	var tokens *AuthResponse
 
 	err := s.db.Transaction(func(tx *gorm.DB) error { 
 		user, err := s.userRepo.FindByIdWithTx(tx, userID)
@@ -237,12 +240,13 @@ func (s *AuthService) toUserResponse(user *user.User) *UserResponse {
 		ID: user.ID,
 		Email: user.Email,
 		Name: user.Name,
+		MiddleName: user.MiddleName,
 		LastName: user.LastName,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
 	}
 }
 
-func (s AuthService) LockUser(userId string) error {
+func (s *AuthService) LockUser(userId string) error {
 	user, err := s.userRepo.FindById(userId)
 
 	if err != nil {

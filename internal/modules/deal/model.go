@@ -24,7 +24,8 @@ type Deal struct {
 	Car *car.Car `gorm:"not null;foreignKey:CarID" json:"car"`
 	CarID *uuid.UUID `json:"carId"`
 
-	OwnerID  uuid.UUID `gorm:"not null" json:"ownerId"`
+	ManagerID  uuid.UUID `gorm:"not null" json:"managerId"`
+	CompanyID uuid.UUID `gorm:"not null" json:"companyId"`
 
 	Client *client.Client `gorm:"not null;foreignKey:ClientID" json:"client"`
 	ClientID *uuid.UUID `json:"clientId"`
@@ -37,3 +38,4 @@ type Deal struct {
 	UpdatedAt time.Time      `json:"updatedAt"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
+

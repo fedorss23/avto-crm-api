@@ -22,10 +22,14 @@ func (r *DealRepository) Create(tx *gorm.DB, deal *Deal) error {
 	return tx.Create(deal).Error
 }
 
-func (r *DealRepository) FindById(id, ownerId string, isFull bool) (*Deal, error) {
+func (r *DealRepository) FindById(id string, scope *DealScope, isFull bool) (*Deal, error) {
 	var deal Deal
 
-	query := r.db.Where("owner_id = ? AND id = ?", ownerId, id)
+	query := r.db.Where("id = ? AND company_id = ?", id, scope.CompanyId)
+
+	if scope.ManagerId != nil {
+		query = query.Where("manager_id = ?", *scope.ManagerId)
+	}
 
 	if isFull {
 		query = query.Preload("Pipeline.Stages").Preload("Car").Preload("Client")
@@ -43,12 +47,19 @@ func (r *DealRepository) FindById(id, ownerId string, isFull bool) (*Deal, error
 	return &deal, nil
 }
 
-func (r *DealRepository) FindFullForUpdate(tx *gorm.DB, id, ownerId string) (*Deal, error) {
+func (r *DealRepository) FindFullForUpdate(tx *gorm.DB, id string, scope *DealScope) (*Deal, error) {
 	var deal Deal
 
-	err := tx.Clauses(clause.Locking{
+	query := tx.Clauses(clause.Locking{
 		Strength: "UPDATE",
-	}).Preload("Pipeline.Stages").First(&deal, "id = ? AND owner_id = ?", id, ownerId).Error
+	}).Preload("Pipeline.Stages").Where("id = ? AND company_id = ?", id, scope.CompanyId)
+
+	if scope.ManagerId != nil {
+		query = query.Where("manager_id = ?", *scope.ManagerId)
+	}
+
+	err := query.First(&deal).Error
+
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.ErrRecordNotFound
@@ -58,13 +69,22 @@ func (r *DealRepository) FindFullForUpdate(tx *gorm.DB, id, ownerId string) (*De
 	}
 
 	return &deal, nil
-
 }
 
-func (r *DealRepository) GetTotalForStatus(ownerId string, status string) (int64, error) {
+func (r *DealRepository) GetTotalForStatus(scope *DealScope, status string) (int64, error) {
 	var total int64
 
-	if err := r.db.Model(&Deal{}).Where("owner_id = ? AND status = ?", ownerId, status).Count(&total).Error; err != nil {
+	query := r.db.Model(&Deal{}).Where("company_id = ?", scope.CompanyId)
+
+	if scope.ManagerId != nil {
+		query = query.Where("manager_id = ?", *scope.ManagerId)
+	}
+
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	if err := r.db.Model(&Deal{}).Count(&total).Error; err != nil {
 		return 0, err
 	}
 
@@ -77,10 +97,10 @@ func (r *DealRepository) FindList(filters *DealFilters) ([]Deal, int64, error) {
 
 	offset := (filters.page - 1) * filters.limit
 
-	query := r.db.Model(&Deal{})
+	query := r.db.Model(&Deal{}).Where("company_id = ?", filters.scope.CompanyId)
 
-	if filters.ownerId != "" {
-		query = query.Where("owner_id = ?", filters.ownerId)
+	if filters.scope.ManagerId != nil{
+		query = query.Where("manager_id = ?", *filters.scope.ManagerId)
 	}
 
 	if filters.clientId != "" {
@@ -108,13 +128,18 @@ func (r *DealRepository) FindList(filters *DealFilters) ([]Deal, int64, error) {
 	return deals, total, err
 }
 
-func (r *DealRepository) Delete(ownerId, dealId string) error {
-	result := r.db.Delete(
-		&Deal{},
-		"id = ? AND owner_id = ?",
+func (r *DealRepository) Delete(dealId string, scope *DealScope) error {
+	query := r.db.Where(
+		"id = ? AND company_id = ?",
 		dealId,
-		ownerId,
+		scope.CompanyId,
 	)
+
+	if scope.ManagerId != nil {
+		query = query.Where("manager_id = ?", *scope.ManagerId)
+	}
+
+	result := query.Delete(&Deal{})
 
 	if result.Error != nil {
 		return result.Error

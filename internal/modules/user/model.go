@@ -1,8 +1,7 @@
 package user
 
 import (
-	"avto-crm-api/internal/modules/client"
-	"avto-crm-api/internal/modules/deal"
+	"avto-crm-api/internal/modules/company"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,12 +16,9 @@ type User struct {
 
 	Name string `gorm:"not null" json:"name"`
 	MiddleName string `gorm:"not null" json:"middleName"`
-	LastName string `json:"lastName,omitempty"`
+	LastName *string `json:"lastName"`
 
-	Role string `json:"role"`
-
-	Deals []deal.Deal `gorm:"foreignKey:OwnerID" json:"deals"`
-	Clients []client.Client `gorm:"foreignKey:OwnerID" json:"clients"`
+	Company []company.Company `gorm:"foreignKey:OwnerID" json:"companyId"`
 
 	IsLocked bool `gorm:"default:false" json:"isLocked"`
 

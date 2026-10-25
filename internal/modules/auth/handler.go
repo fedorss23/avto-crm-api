@@ -41,7 +41,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	h.cookieConfig.SetRefreshToken(c, authresp.RefreshToken)
 
-	ans := &RegisterResponse{
+	ans := &AuthResponseWithoutRefreshToken{
 		User:        authresp.User,
 		AccessToken: authresp.AccessToken,
 	}
@@ -61,13 +61,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	authresp, err := h.service.Login(&req, c.ClientIP())
 
 	if err != nil {
-		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
+		utils.CallErrrorResponse(c, err)
 		return
 	}
 
 	h.cookieConfig.SetRefreshToken(c, authresp.RefreshToken)
 
-	ans := &RegisterResponse{
+	ans := &AuthResponseWithoutRefreshToken{
 		User:        authresp.User,
 		AccessToken: authresp.AccessToken,
 	}
@@ -84,7 +84,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	tokens, err := h.service.RefreshToken(refreshToken)
 
 	if err != nil {
-		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
+		utils.CallErrrorResponse(c, err)
 		return
 	}
 
@@ -96,16 +96,16 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	}
 
 	if err := h.blacklistService.Add(c.Request.Context(), refreshToken, refreshTtl); err != nil {
-		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
+		utils.CallErrrorResponse(c, err)
 		return
 	}
 
 	if err := h.blacklistService.Add(c.Request.Context(), accessToken, accessTtl); err != nil {
-		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
+		utils.CallErrrorResponse(c, err)
 		return
 	}
 
-	ans := &RegisterResponse{
+	ans := &AuthResponseWithoutRefreshToken{
 		User:        tokens.User,
 		AccessToken: tokens.AccessToken,
 	}
@@ -186,7 +186,12 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	h.cookieConfig.ClearAuthCookies(c)
 
-	utils.SuccessResponse(c, http.StatusOK, "Password successfully changed", data)
+	h.cookieConfig.SetRefreshToken(c, data.RefreshToken)
+
+	utils.SuccessResponse(c, http.StatusOK, "Password successfully changed", &AuthResponseWithoutRefreshToken{
+		AccessToken: data.AccessToken,
+		User: data.User,
+	})
 }
 
 func (h *AuthHandler) GetProfile(c *gin.Context) {

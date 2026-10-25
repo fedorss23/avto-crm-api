@@ -75,7 +75,7 @@ type TotalData struct {
 }
 
 type DealFilters struct {
-	ownerId string
+	scope *DealScope
 	page int
 	limit int
 	isFull bool
@@ -86,4 +86,9 @@ type DealFilters struct {
 
 type OneDealResponse struct {
 	Deal Deal `json:"deal"`
+}
+
+type DealScope struct {
+	CompanyId string
+	ManagerId *string
 }
