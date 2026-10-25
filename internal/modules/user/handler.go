@@ -24,12 +24,7 @@ func (h *UserHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	var ownerId string
-	if err := utils.GetOwnerId(c, &ownerId); err != nil {
-		return
-	}
-
-	err := h.userService.Delete(userId, ownerId)
+	err := h.userService.Delete(userId)
 
 	if err != nil {
 		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))

@@ -3,6 +3,7 @@ package deal
 import (
 	"avto-crm-api/internal/utils"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -21,8 +22,8 @@ func NewDealHandler(dealService *DealService) *DealHandler {
 func (h *DealHandler) CreateFullDeal(c *gin.Context) {
 	var req CreateDealRequest
 
-	var ownerId string
-	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+	scope, err := h.getDealScopeWithQueryManager(c)
+	if err != nil {
 		return
 	}
 
@@ -32,7 +33,7 @@ func (h *DealHandler) CreateFullDeal(c *gin.Context) {
 		return
 	}
 
-	deal, err := h.dealService.CreateFullDeal(&req, ownerId)
+	deal, err := h.dealService.CreateFullDeal(&req, scope)
 	if err != nil {
 		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "error with creating deal", err, utils.CodeByError(err))
 		return
@@ -46,8 +47,8 @@ func (h *DealHandler) CreateFullDeal(c *gin.Context) {
 func (h *DealHandler) Update(c *gin.Context) {
 	var req UpdateDealRequest
 
-	var ownerId string
-	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+	scope, err := h.getDealScope(c)
+	if err != nil {
 		return
 	}
 
@@ -62,7 +63,7 @@ func (h *DealHandler) Update(c *gin.Context) {
 		return
 	}
 
-	deal, err := h.dealService.Update(&req, ownerId, dealId)
+	deal, err := h.dealService.Update(&req, dealId, scope)
 	if err != nil {
 		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
 		return
@@ -74,8 +75,8 @@ func (h *DealHandler) Update(c *gin.Context) {
 }
 
 func (h *DealHandler) GetTotalByStatus(c *gin.Context) {
-	var ownerId string
-	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+	scope, err := h.getDealScopeWithQueryManager(c)
+	if err != nil {
 		return
 	}
 
@@ -90,7 +91,7 @@ func (h *DealHandler) GetTotalByStatus(c *gin.Context) {
 		}
 	}
 
-	total, err := h.dealService.GetTotalByStatus(ownerId, status)
+	total, err := h.dealService.GetTotalByStatus(scope, status)
 
 	if err != nil {
 		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "error with getting deals by owner id", err, utils.CodeByError(err))
@@ -106,8 +107,8 @@ func (h *DealHandler) GetTotalByStatus(c *gin.Context) {
 }
 
 func (h *DealHandler) FindList(c *gin.Context) {
-	var ownerId string
-	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+	scope, err := h.getDealScopeWithQueryManager(c)
+	if err != nil {
 		return
 	}
 
@@ -141,13 +142,13 @@ func (h *DealHandler) FindList(c *gin.Context) {
 	clientId, _ := c.GetQuery("clientId")
 
 	deals, total, err := h.dealService.FindDealByOwnerId(&DealFilters{
-		ownerId:  ownerId,
-		clientId: clientId,
-		page:     page,
-		limit:    limit,
-		status:   status,
-		search:   search,
-		isFull:   isFull,
+		scope: scope,
+		clientId:  clientId,
+		page:      page,
+		limit:     limit,
+		status:    status,
+		search:    search,
+		isFull:    isFull,
 	})
 
 	if err != nil {
@@ -166,8 +167,8 @@ func (h *DealHandler) FindList(c *gin.Context) {
 }
 
 func (h *DealHandler) Delete(c *gin.Context) {
-	var ownerId string
-	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+	scope, err := h.getDealScope(c)
+	if err != nil {
 		return
 	}
 
@@ -176,9 +177,7 @@ func (h *DealHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	err := h.dealService.Delete(ownerId, dealId)
-
-	if err != nil {
+	if err := h.dealService.Delete(dealId, scope); err != nil {
 		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "Error with delete deal", err, utils.CodeByError(err))
 		return
 	}
@@ -197,12 +196,12 @@ func (h *DealHandler) FindById(c *gin.Context) {
 		return
 	}
 
-	var ownerId string
-	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+	scope, err := h.getDealScope(c)
+	if err != nil {
 		return
 	}
 
-	deal, err := h.dealService.FindById(dealId, ownerId, isFull)
+	deal, err := h.dealService.FindById(dealId, scope, isFull)
 
 	if err != nil {
 		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "Error with found deal by id", err, utils.CodeByError(err))
@@ -212,4 +211,48 @@ func (h *DealHandler) FindById(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, "deal successfully found", &OneDealResponse{
 		Deal: *deal,
 	})
+}
+
+func (h *DealHandler) getDealScope(c *gin.Context) (*DealScope, error) {
+	var scope DealScope
+
+	var userId string
+	userType, err := utils.GetUserId(c, &userId)
+	if err != nil {
+		return nil, err
+	}
+
+	scope.CompanyId = c.GetString("companyId")
+
+	if userType == "manager" {
+		scope.ManagerId = &userId
+	}
+
+	return &scope, nil
+}
+
+func (h *DealHandler) getDealScopeWithQueryManager(c *gin.Context) (*DealScope, error) {
+	var scope DealScope
+
+	var userId string
+	userType, err := utils.GetUserId(c, &userId)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println(userId)
+
+	scope.CompanyId = c.GetString("companyId")
+	
+	if userType == "manager" {
+		scope.ManagerId = &userId
+	} else {
+		manager, ok := c.GetQuery("managerId")
+
+		if ok && manager != "" {
+			scope.ManagerId = &manager
+		} 
+	}
+
+	return &scope, nil
 }

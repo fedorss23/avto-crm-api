@@ -4,7 +4,9 @@ import (
 	"avto-crm-api/internal/config"
 	"avto-crm-api/internal/modules/car"
 	"avto-crm-api/internal/modules/client"
+	"avto-crm-api/internal/modules/company"
 	"avto-crm-api/internal/modules/deal"
+	"avto-crm-api/internal/modules/manager"
 	"avto-crm-api/internal/modules/pipeline"
 	"avto-crm-api/internal/modules/stage"
 	"avto-crm-api/internal/modules/user"
@@ -60,6 +62,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&stage.Stage{},
 		&client.Client{},
 		&deal.Deal{},
+		&manager.Manager{},
+		&company.Company{},
 	)
 
 	if err != nil {

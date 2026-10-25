@@ -66,3 +66,33 @@ http://localhost:8080/api/v1/deal/by-id/808ad1fd-6d30-40c2-a5a3-4b00804096c1?isF
 bf15432e-fdc7-4f43-af05-d88e96a9010a
 
 bf15432e-fdc7-4f43-af05-d88e96a9010a
+
+
+{
+	"name": "huiall",
+	"pipeline": {
+		"name": "first",
+		"source": "korea",
+		"destination": "chelyare",
+		"stages": [
+			{
+    		"name": "first stage",
+    		"description": "stage"
+   		},
+   		{
+      	"name": "second stage",
+      	"description": "stage"
+   		}
+		]
+	},
+	"car": {
+		"model": "BMW"
+	},
+	"client": {
+		"name": "fewfe",
+		"email": "lesssa886@gmail.com",
+		"phone": "+79930797624"
+	},
+	"term": 60,
+	"total": 6000000
+}

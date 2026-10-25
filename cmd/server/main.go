@@ -5,9 +5,12 @@ import (
 	"avto-crm-api/internal/config"
 	"avto-crm-api/internal/database"
 	"avto-crm-api/internal/modules/auth"
+	authmanagers "avto-crm-api/internal/modules/auth-managers"
 	"avto-crm-api/internal/modules/car"
 	"avto-crm-api/internal/modules/client"
+	"avto-crm-api/internal/modules/company"
 	"avto-crm-api/internal/modules/deal"
+	"avto-crm-api/internal/modules/manager"
 	"avto-crm-api/internal/modules/pipeline"
 	"avto-crm-api/internal/modules/stage"
 	"avto-crm-api/internal/modules/user"
@@ -69,24 +72,37 @@ func main() {
 	dealRepo := deal.NewDealRepository(db)
 	carRepo := car.NewCarRepository(db)
 	clientRepo := client.NewClientRepository(db)
-	stageRepo := stage.NewStageRepository()
+	stageRepo := stage.NewStageRepository(db)
 	pipelineRepo := pipeline.NewPipelineRepository()
+	companyRepo := company.NewCompanyRepository(db)
+	managerRepo := manager.NewManagerRepository(db)
 
+	authMConfig := authmanagers.Config{
+		AccessTokenDuration:  15 * time.Minute,
+		RefreshTokenDuration: 7 * 24 * time.Hour,
+		MaxLoginAttempts:     5,
+		LockDuration:         10 * time.Minute,
+	}
+
+	authManagerService := authmanagers.NewAuthService(managerRepo, companyRepo, jwtMaker, &authMConfig, db)
 	authService := auth.NewAuthService(userRepo, jwtMaker, serviceConfig, db)
-	dealService := deal.NewDealService(db, dealRepo, carRepo, pipelineRepo, stageRepo, clientRepo)
+	dealService := deal.NewDealService(db, dealRepo, carRepo, pipelineRepo, stageRepo, clientRepo, managerRepo)
 	carService := car.NewCarService(carRepo)
 	clientSerivce := client.NewClientService(clientRepo)
 	pipelineService := pipeline.NewPipelineService(pipelineRepo, db)
 	userService := user.NewUserService(userRepo)
+	companyService := company.NewCompanyService(companyRepo)
 
 	cookieConfig := cookie.NewCookieConfig(cfg.Domain, cfg.Secure)
 
+	authManagerHandler := authmanagers.NewAuthManagersHandler(authManagerService, cookieConfig)
 	authHandler := auth.NewAuthHandler(authService, cookieConfig, blacklist)
 	dealHandler := deal.NewDealHandler(dealService)
 	carHandler := car.NewCarHandler(carService)
 	clientHandler := client.NewClientHandler(clientSerivce)
 	pipelineHandler := pipeline.NewPipelineHandler(pipelineService)
 	userHandler := user.NewUserHandler(userService)
+	companyHandler := company.NewCompanyHandler(companyService)
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -125,7 +141,7 @@ func main() {
 			auth.POST("/refresh-tokens", authHandler.Refresh)
 
 			aauth := auth.Group("")
-			aauth.Use(middleware.AuthMiddleware(cfg.JWTSecret, blacklist.IsBlacklisted))
+			aauth.Use(middleware.UserAuthMiddleware(cfg.JWTSecret))
 			{
 				aauth.POST("/logout", authHandler.Logout)
 				aauth.GET("/profile", authHandler.GetProfile)
@@ -133,8 +149,27 @@ func main() {
 			}
 		}
 
+		authM := api.Group("/auth-manager")
+		{
+			authM.POST("/login", authManagerHandler.Login)
+			
+			authMA := api.Group("")
+			authMA.Use(middleware.ManagerAuthMiddleware(cfg.JWTSecret))
+			{
+				authMA.POST("/refresh-tokens", authManagerHandler.RefreshTokens)
+				authMA.POST("/", authManagerHandler.ChangePassword)
+			}
+
+			authMr := authM.Group("")
+			authMr.Use(middleware.UserAuthMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
+			{
+				authMr.POST("/register", authManagerHandler.Register)
+			}
+
+		}
+
 		deal := api.Group("/deal")
-		deal.Use(middleware.AuthMiddleware(cfg.JWTSecret, blacklist.IsBlacklisted))
+		deal.Use(middleware.StandartMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
 		{
 			deal.GET("", dealHandler.FindList)
 			deal.GET("/total", dealHandler.GetTotalByStatus)
@@ -151,23 +186,29 @@ func main() {
 		}
 
 		client := api.Group("/client")
-		client.Use(middleware.AuthMiddleware(cfg.JWTSecret, blacklist.IsBlacklisted))
+		client.Use(middleware.UserAuthMiddleware(cfg.JWTSecret))
 		{
 			client.GET(":clientId", clientHandler.FindById)
 			client.GET("/by-owner", clientHandler.FindListByOwnerId)
 		}
 
 		pipeline := api.Group("/pipeline")
-		pipeline.Use(middleware.AuthMiddleware(cfg.JWTSecret, blacklist.IsBlacklisted))
+		pipeline.Use(middleware.UserAuthMiddleware(cfg.JWTSecret))
 		{
 			pipeline.GET("", pipelineHandler.FindList)
 		}
 
 		users := api.Group("/users")
-		users.Use(middleware.AdminMiddleware(cfg.JWTSecret, blacklist.IsBlacklisted))
+		users.Use(middleware.UserAuthMiddleware(cfg.JWTSecret))
 		{
 			users.GET("", userHandler.FindList)
 			users.DELETE(":userId", userHandler.Delete)
+		}
+
+		company := api.Group("/company")
+		company.Use(middleware.UserAuthMiddleware(cfg.JWTSecret))
+		{
+			company.POST("", companyHandler.Create)
 		}
 	}
 

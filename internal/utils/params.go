@@ -21,6 +21,34 @@ func GetOwnerId(c *gin.Context, ownerId *string) error {
 	return nil
 }
 
+func GetUserId(c *gin.Context, container *string) (string, error) {
+	userType := c.GetString("type")
+	if userType == "" {
+		ErrorResponse(c, 401, "not authorized", errors.New("not authorized"), "NOT_AUTHORIZED")
+		return "", errors.New("not authorized")
+	}
+
+	userId := c.GetString("userId")
+	if userId == "" {
+		ErrorResponse(c, 401, "not authorized", errors.New("not authorized"), "NOT_AUTHORIZED")
+		return "", errors.New("not authorized")
+	}
+
+	*container = userId
+
+	return userType, nil
+}
+
+func GetCompany(c *gin.Context, container *string) error {
+	*container = c.GetString("companyId")
+	if *container == "" {
+		ErrorResponse(c, 401, "not authorized", errors.New("not authorized"), "NOT_AUTHORIZED")
+		return errors.New("not authorized")
+	}
+
+	return nil
+}
+
 func GetParam(c *gin.Context, name string, cont *string) error {
 	param := c.Param(name)
 

@@ -7,7 +7,8 @@ type RegisterRequest struct {
 	Email string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8,max=72"`
 	Name string `json:"name" binding:"required"`
-	LastName string `json:"lastName" binding:"required"`
+	MiddleName string `json:"middleName" binding:"required"`
+	LastName *string `json:"lastName"`
 	Phone string `json:"phone,omitempty"`
 }
 
@@ -44,7 +45,8 @@ type UserResponse struct {
 	ID uuid.UUID `json:"id"`
 	Email string `json:"email"`
 	Name string `json:"name"`
-	LastName string `json:"lastName"`
+	MiddleName string `json:"middleName"`
+	LastName *string `json:"lastName"`
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -58,19 +60,7 @@ type LogoutResponse struct {
 	Message string `json:"message"`
 }
 
-type LoginResult struct {
-	User UserResponse `json:"user"`
-	AccessToken string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
-}
-
-type RefreshResult struct {
-	User UserResponse `json:"user"`
-	AccessToken string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
-}
-
-type RegisterResponse struct {
+type AuthResponseWithoutRefreshToken struct {
 	User UserResponse `json:"user"`
 	AccessToken string `json:"accessToken"`
 }

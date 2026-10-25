@@ -27,9 +27,12 @@ var (
 	ErrLastStage      = errors.New("deal has last stage")
 
 	ErrEmailAlredyExists         = errors.New("email already exists")
+	ErrLoginAlreadyExists        = errors.New("login already exists")
 	ErrInvalidRefreshToken       = errors.New("invalid refresh token")
 	ErrPasswordIncorrectLogin    = errors.New("invalid password")
 	ErrPasswordIncorrectRegister = errors.New("invalid password")
+
+	ErrNotManagers = errors.New("ou should have at least one manager")
 )
 
 const (
@@ -63,7 +66,7 @@ func CodeByError(err error) string {
 	case errors.Is(err, ErrForbidden):
 		return ForbiddenCode
 
-	case errors.Is(err, ErrEmailAlredyExists), errors.Is(err, ErrConflict):
+	case errors.Is(err, ErrEmailAlredyExists), errors.Is(err, ErrConflict), errors.Is(err, ErrLoginAlreadyExists), errors.Is(err, ErrNotManagers):
 		return ConflictCode
 
 	case errors.Is(err, ErrUnauthorized):
@@ -122,14 +125,16 @@ func ErrorToHTTPStatus(err error) int {
 
 	case errors.Is(err, ErrInvalidStageId),
 		errors.Is(err, ErrPasswordIncorrectRegister),
-		errors.Is(err, ErrEmailAlredyExists),
 		errors.Is(err, ErrPasswordIncorrectLogin):
 		return http.StatusBadRequest
 
 	case errors.Is(err, ErrNotPipeline),
 		errors.Is(err, ErrEmptyPipeline),
 		errors.Is(err, ErrNotStages),
-		errors.Is(err, ErrLastStage):
+		errors.Is(err, ErrEmailAlredyExists),
+		errors.Is(err,ErrLoginAlreadyExists),
+		errors.Is(err, ErrLastStage),
+		errors.Is(err, ErrNotManagers):
 		return http.StatusConflict
 
 	default:
@@ -172,7 +177,7 @@ func ToQueryErrorMessageWithType(name string, queryType string) string {
 }
 
 func ToQueryErrorWithType(name string, queryType string) error {
-	return errors.New(fmt.Sprintf("%s must be %s", name, queryType))
+	return fmt.Errorf("%s must be %s", name, queryType)
 }
 
 func ToQueryErrorMessage(name string) string {
@@ -180,11 +185,11 @@ func ToQueryErrorMessage(name string) string {
 }
 
 func ToQueryError(name string) error {
-	return errors.New(fmt.Sprintf("Missing %s", name))
+	return fmt.Errorf("Missing %s", name)
 }
 
 func ToParamError(name string) error {
-	return errors.New(fmt.Sprintf("Missing %s", name))
+	return fmt.Errorf("Missing %s", name)
 }
 
 func ToMissingParamMessage(name string) string {
