@@ -20,12 +20,12 @@ func (r *StageRepository) Create(tx *gorm.DB, stage *Stage) error {
 }
 
 func (r *StageRepository) Update(data map[string]interface{}, stageId string, ownerId string) (*Stage, error) {
-	var stage *Stage
-	if err := r.db.Model(stage).Where("id = ? AND owner_id = ?", stageId, ownerId).Updates(data).Error; err != nil {
+	var stage Stage
+	if err := r.db.Model(&stage).Where("id = ? AND owner_id = ?", stageId, ownerId).Updates(data).Error; err != nil {
 		return nil, err
 	}
 
-	return stage, nil
+	return &stage, nil
 }
 
 func (r *StageRepository) Delete(tx *gorm.DB, stageID uuid.UUID) error {

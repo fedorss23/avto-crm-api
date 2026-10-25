@@ -127,6 +127,7 @@ func UserAuthMiddleware(secret string) gin.HandlerFunc {
 		c.Set("userId", claims.UserID)
 		c.Set("email", claims.Email)
 		c.Set("type", "owner")
+		c.Next()
 	}
 }
 

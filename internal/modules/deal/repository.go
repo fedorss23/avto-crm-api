@@ -84,7 +84,7 @@ func (r *DealRepository) GetTotalForStatus(scope *DealScope, status string) (int
 		query = query.Where("status = ?", status)
 	}
 
-	if err := r.db.Model(&Deal{}).Count(&total).Error; err != nil {
+	if err := query.Model(&Deal{}).Count(&total).Error; err != nil {
 		return 0, err
 	}
 
