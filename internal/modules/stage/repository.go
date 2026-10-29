@@ -5,7 +5,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type StageRepository struct {}
+type StageRepository struct{}
 
 func NewStageRepository() *StageRepository {
 	return &StageRepository{}

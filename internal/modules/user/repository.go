@@ -8,7 +8,7 @@ import (
 type UserRepository struct {
 	db *gorm.DB
 }
-	
+
 func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{
 		db: db,
@@ -43,7 +43,7 @@ func (r *UserRepository) FindByEmail(email string) (*User, error) {
 
 func (r *UserRepository) Create(user *User) error {
 	return r.db.Create(user).Error
-} 
+}
 
 func (r *UserRepository) Update(user *User) error {
 	return r.db.Save(user).Error

@@ -2,17 +2,16 @@ package auth
 
 import "github.com/google/uuid"
 
-
 type RegisterRequest struct {
-	Email string `json:"email" binding:"required,email"`
+	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8,max=72"`
-	Name string `json:"name" binding:"required"`
+	Name     string `json:"name" binding:"required"`
 	LastName string `json:"lastName" binding:"required"`
-	Phone string `json:"phone,omitempty"`
+	Phone    string `json:"phone,omitempty"`
 }
 
 type LoginRequest struct {
-	Email string `json:"email" binding:"required,email"`
+	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -30,30 +29,30 @@ type ForgotPasswordRequest struct {
 }
 
 type ResetPasswordRequest struct {
-	Token string `json:"token" binding:"required"`
+	Token    string `json:"token" binding:"required"`
 	Password string `json:"password" binding:"required,min=8,max=72"`
 }
 
 type AuthResponse struct {
-	AccessToken string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
-	TokenType string `json:"tokenType"`
-	ExpiresIn int64 `json:"expiresIn"`
-	User UserResponse `json:"user"`
+	AccessToken  string       `json:"accessToken"`
+	RefreshToken string       `json:"refreshToken"`
+	TokenType    string       `json:"tokenType"`
+	ExpiresIn    int64        `json:"expiresIn"`
+	User         UserResponse `json:"user"`
 }
 
 type UserResponse struct {
-	ID uuid.UUID `json:"id"`
-	Email string `json:"email"`
-	Name string `json:"name"`
-	LastName string `json:"lastName"`
-	CreatedAt string `json:"createdAt"`
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	Name      string    `json:"name"`
+	LastName  string    `json:"lastName"`
+	CreatedAt string    `json:"createdAt"`
 }
 
 type TokensResponse struct {
-	AccessToken string `json:"accessToken"`
+	AccessToken  string `json:"accessToken"`
 	RefreshToken string `json:"refreshToken"`
-	ExpiresIn int64 `json:"expiresIn"`
+	ExpiresIn    int64  `json:"expiresIn"`
 }
 
 type LogoutResponse struct {
@@ -61,18 +60,18 @@ type LogoutResponse struct {
 }
 
 type LoginResult struct {
-	User UserResponse `json:"user"`
-	AccessToken string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
+	User         UserResponse `json:"user"`
+	AccessToken  string       `json:"accessToken"`
+	RefreshToken string       `json:"refreshToken"`
 }
 
 type RefreshResult struct {
-	User UserResponse `json:"user"`
-	AccessToken string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
+	User         UserResponse `json:"user"`
+	AccessToken  string       `json:"accessToken"`
+	RefreshToken string       `json:"refreshToken"`
 }
 
 type RegisterResponse struct {
-	User UserResponse `json:"user"`
-	AccessToken string `json:"accessToken"`
+	User        UserResponse `json:"user"`
+	AccessToken string       `json:"accessToken"`
 }

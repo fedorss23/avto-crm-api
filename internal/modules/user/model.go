@@ -10,18 +10,18 @@ import (
 )
 
 type User struct {
-	ID   uuid.UUID `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	ID uuid.UUID `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 
-	Email string `gorm:"uniqueIndex;not null" json:"email"`
+	Email    string `gorm:"uniqueIndex;not null" json:"email"`
 	Password string `gorm:"" json:"-"`
 
-	Name string `gorm:"not null" json:"name"`
+	Name       string `gorm:"not null" json:"name"`
 	MiddleName string `gorm:"not null" json:"middleName"`
-	LastName string `json:"lastName,omitempty"`
+	LastName   string `json:"lastName,omitempty"`
 
 	Role string `json:"role"`
 
-	Deals []deal.Deal `gorm:"foreignKey:OwnerID" json:"deals"`
+	Deals   []deal.Deal     `gorm:"foreignKey:OwnerID" json:"deals"`
 	Clients []client.Client `gorm:"foreignKey:OwnerID" json:"clients"`
 
 	CreatedAt time.Time      `json:"createdAt"`

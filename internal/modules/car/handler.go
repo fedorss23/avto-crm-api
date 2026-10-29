@@ -71,7 +71,7 @@ func (h *CarHandler) FindAll(c *gin.Context) {
 
 	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("Получено карточек: %d", total), &CarListWithTotal{
 		Total: total,
-		Cars: cars,
+		Cars:  cars,
 	})
 }
 

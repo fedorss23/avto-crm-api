@@ -12,28 +12,28 @@ import (
 )
 
 type DealService struct {
-	db        *gorm.DB
-	dealRepo  *DealRepository
-	pipeRepo  *pipeline.PipelineRepository
-	stageRepo *stage.StageRepository
-	carRepo   *car.CarRepository
+	db         *gorm.DB
+	dealRepo   *DealRepository
+	pipeRepo   *pipeline.PipelineRepository
+	stageRepo  *stage.StageRepository
+	carRepo    *car.CarRepository
 	clientRepo *client.ClientRepository
 }
 
 func NewDealService(
-	db *gorm.DB, 
-	dealRepo *DealRepository, 
-	carRepo *car.CarRepository, 
-	pipeRepo *pipeline.PipelineRepository, 
+	db *gorm.DB,
+	dealRepo *DealRepository,
+	carRepo *car.CarRepository,
+	pipeRepo *pipeline.PipelineRepository,
 	stageRepo *stage.StageRepository,
 	clientRepo *client.ClientRepository,
 ) *DealService {
 	return &DealService{
-		db:       db,
-		dealRepo: dealRepo,
-		carRepo:  carRepo,
-		pipeRepo: pipeRepo,
-		stageRepo: stageRepo,
+		db:         db,
+		dealRepo:   dealRepo,
+		carRepo:    carRepo,
+		pipeRepo:   pipeRepo,
+		stageRepo:  stageRepo,
 		clientRepo: clientRepo,
 	}
 }
@@ -69,11 +69,11 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 		}
 
 		client := &client.Client{
-			Name: req.Client.Name,
+			Name:    req.Client.Name,
 			OwnerID: oid,
 		}
 
-		if req.Client.Email != nil  {
+		if req.Client.Email != nil {
 			client.Email = req.Client.Email
 		}
 
@@ -90,10 +90,10 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, ownerId string) err
 			Pipeline: pipeline,
 			OwnerID:  oid,
 			Car:      car,
-			Client: client,
-			Term: req.Term,
-			DueDate: dueDate,
-			Total: req.Total,
+			Client:   client,
+			Term:     req.Term,
+			DueDate:  dueDate,
+			Total:    req.Total,
 		}
 
 		if err := s.dealRepo.Create(tx, deal); err != nil {

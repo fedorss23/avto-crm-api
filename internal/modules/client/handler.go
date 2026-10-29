@@ -25,7 +25,7 @@ func (h *ClientHandler) FindById(c *gin.Context) {
 
 	if id == "" {
 		utils.ErrorResponse(c, http.StatusBadRequest, "missed client id", errors.New("missed client id"))
-		return 
+		return
 	}
 
 	ownerId := c.GetString("userId")

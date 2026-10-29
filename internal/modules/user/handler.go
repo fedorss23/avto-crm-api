@@ -41,7 +41,7 @@ func (h *UserHandler) Delete(c *gin.Context) {
 
 func (h *UserHandler) FindList(c *gin.Context) {
 	var pageInt int
-	
+
 	page, exists := c.GetQuery("page")
 	if !exists {
 		pageInt = 1

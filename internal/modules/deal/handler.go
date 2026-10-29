@@ -22,7 +22,7 @@ func NewDealHandler(dealService *DealService) *DealHandler {
 
 func (h *DealHandler) FindAll(c *gin.Context) {
 	var pageInt int
-	
+
 	page, exists := c.GetQuery("page")
 	if !exists {
 		pageInt = 1
@@ -127,8 +127,6 @@ func (h *DealHandler) FindDealByOwnerId(c *gin.Context) {
 	}
 
 	deals, total, err := h.dealService.FindDealByOwnerId(id)
-
-	
 
 	if err != nil {
 		if deals != nil {

@@ -1,9 +1,9 @@
 package utils
 
 import (
-	"github.com/go-playground/validator/v10"
 	"errors"
 	"fmt"
+	"github.com/go-playground/validator/v10"
 )
 
 func ParseValidationErrors(err error) map[string]string {

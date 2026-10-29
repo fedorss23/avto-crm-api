@@ -47,4 +47,3 @@ func (r *PipelineRepository) FindList(tx *gorm.DB, page, limit int) ([]Pipeline,
 
 	return pipelines, total, err
 }
-

@@ -1,30 +1,30 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"time"
-	"fmt"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	DBName string
-	DBPassword string
-	DBUser string
-	DBHost string
-	DBPort int
-	ServerPort string
-	Domain string
-	Issuer string
+	DBName            string
+	DBPassword        string
+	DBUser            string
+	DBHost            string
+	DBPort            int
+	ServerPort        string
+	Domain            string
+	Issuer            string
 	DBMaxOpenConns    int
 	DBMaxIdleConns    int
 	DBConnMaxLifetime time.Duration
-	Secure bool
-	JWTSecret string
-	Version string
+	Secure            bool
+	JWTSecret         string
+	Version           string
 }
 
 func LoadConfig() *Config {
@@ -42,17 +42,17 @@ func LoadConfig() *Config {
 	lifetime, _ := time.ParseDuration(getEnv("DB_CONN_MAX_LIFETIME", "5m"))
 
 	cfg := &Config{
-		DBName: getEnv("DB_NAME", "test"),
-		DBPassword: getEnv("DB_PASSWORD", ""),
-		DBUser: getEnv("DB_USER", "postgres"),
-		DBPort: dbport,
-		DBHost: getEnv("DB_HOST", "localhost"),
-		ServerPort: getEnv("SERVER_PORT", "8080"),
-		DBMaxOpenConns: dbmax,
-		DBMaxIdleConns: maxIdle,
+		DBName:            getEnv("DB_NAME", "test"),
+		DBPassword:        getEnv("DB_PASSWORD", ""),
+		DBUser:            getEnv("DB_USER", "postgres"),
+		DBPort:            dbport,
+		DBHost:            getEnv("DB_HOST", "localhost"),
+		ServerPort:        getEnv("SERVER_PORT", "8080"),
+		DBMaxOpenConns:    dbmax,
+		DBMaxIdleConns:    maxIdle,
 		DBConnMaxLifetime: lifetime,
-		JWTSecret: getEnv("JWT_SECRET", "pass@w0rd"),
-		Version: version,
+		JWTSecret:         getEnv("JWT_SECRET", "pass@w0rd"),
+		Version:           version,
 	}
 
 	switch version {

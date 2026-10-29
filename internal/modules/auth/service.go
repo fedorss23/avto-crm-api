@@ -10,23 +10,23 @@ import (
 )
 
 type Config struct {
-	AccessTokenDuration time.Duration
+	AccessTokenDuration  time.Duration
 	RefreshTokenDuration time.Duration
-	MaxLoginAttempts int
-	LockDuration time.Duration
+	MaxLoginAttempts     int
+	LockDuration         time.Duration
 }
 
 type AuthService struct {
 	userRepo *user.UserRepository
 	jwtMaker *jwt.JWTMaker
-	config *Config
+	config   *Config
 }
 
 func NewAuthService(userRepo *user.UserRepository, jwtMaker *jwt.JWTMaker, cfg *Config) *AuthService {
 	return &AuthService{
 		userRepo: userRepo,
 		jwtMaker: jwtMaker,
-		config: cfg,
+		config:   cfg,
 	}
 }
 
@@ -49,11 +49,11 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 	}
 
 	user := &user.User{
-		Email: req.Email,
+		Email:    req.Email,
 		Password: string(hash),
-		Name: req.Name,
+		Name:     req.Name,
 		LastName: req.LastName,
-		Role: "user",
+		Role:     "user",
 	}
 
 	if err := s.userRepo.Create(user); err != nil {
@@ -67,11 +67,11 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 	}
 
 	return &AuthResponse{
-		AccessToken: tokens.AccessToken,
+		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
-		TokenType: "Bearer",
-		ExpiresIn: int64(s.config.AccessTokenDuration.Seconds()),
-		User: *s.toUserResponse(user),
+		TokenType:    "Bearer",
+		ExpiresIn:    int64(s.config.AccessTokenDuration.Seconds()),
+		User:         *s.toUserResponse(user),
 	}, nil
 }
 
@@ -89,10 +89,10 @@ func (s *AuthService) Login(req *LoginRequest, ip string) (*LoginResult, error) 
 	// 	return nil, ErrUserLocked
 	// }
 
-	match, err := utils.Verify(req.Password, user.Password) 
+	match, err := utils.Verify(req.Password, user.Password)
 
 	if err != nil || !match {
-		return  nil, ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 
 	// s.resetLoginAttempts(user.ID)
@@ -108,8 +108,8 @@ func (s *AuthService) Login(req *LoginRequest, ip string) (*LoginResult, error) 
 	}
 
 	return &LoginResult{
-		User: *s.toUserResponse(user),
-		AccessToken: tokenResponse.AccessToken,
+		User:         *s.toUserResponse(user),
+		AccessToken:  tokenResponse.AccessToken,
 		RefreshToken: tokenResponse.RefreshToken,
 	}, nil
 }
@@ -136,8 +136,8 @@ func (s *AuthService) RefreshToken(refreshToken string) (*RefreshResult, error) 
 	}
 
 	return &RefreshResult{
-		User: *s.toUserResponse(user),
-		AccessToken: tokenResponse.AccessToken,
+		User:         *s.toUserResponse(user),
+		AccessToken:  tokenResponse.AccessToken,
 		RefreshToken: tokenResponse.RefreshToken,
 	}, nil
 }
@@ -200,19 +200,18 @@ func (s *AuthService) generateTokens(user *user.User) (*TokensResponse, error) {
 	}
 
 	return &TokensResponse{
-		AccessToken: accessToken,
+		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		ExpiresIn: int64(s.config.AccessTokenDuration.Seconds()),
+		ExpiresIn:    int64(s.config.AccessTokenDuration.Seconds()),
 	}, nil
 }
 
-
 func (s *AuthService) toUserResponse(user *user.User) *UserResponse {
 	return &UserResponse{
-		ID: user.ID,
-		Email: user.Email,
-		Name: user.Name,
-		LastName: user.LastName,
+		ID:        user.ID,
+		Email:     user.Email,
+		Name:      user.Name,
+		LastName:  user.LastName,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
 	}
 }
@@ -224,7 +223,7 @@ func (s *AuthService) toUserResponse(user *user.User) *UserResponse {
 
 // 	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
 // 		return ErrUserLocked
-// 	} 
+// 	}
 
 // 	return nil
 // }

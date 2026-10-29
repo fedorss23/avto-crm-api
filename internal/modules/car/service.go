@@ -1,4 +1,4 @@
-package car 
+package car
 
 type CarService struct {
 	carRepo *CarRepository

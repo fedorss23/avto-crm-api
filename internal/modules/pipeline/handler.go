@@ -23,7 +23,7 @@ func NewPipelineHandler(pipeService *PipelineService) *PipelineHandler {
 
 func (h *PipelineHandler) FindList(c *gin.Context) {
 	var pageInt int
-	
+
 	page, exists := c.GetQuery("page")
 	if !exists {
 		pageInt = 1

@@ -6,13 +6,13 @@ import (
 
 type PipelineService struct {
 	pipeRepo *PipelineRepository
-	db *gorm.DB
+	db       *gorm.DB
 }
 
 func NewPipelineService(pipeRepo *PipelineRepository, db *gorm.DB) *PipelineService {
 	return &PipelineService{
 		pipeRepo: pipeRepo,
-		db: db,
+		db:       db,
 	}
 }
 

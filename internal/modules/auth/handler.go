@@ -75,7 +75,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	h.cookieConfig.SetRefreshToken(c, authresp.RefreshToken)
 
 	ans := &RegisterResponse{
-		User: authresp.User,
+		User:        authresp.User,
 		AccessToken: authresp.AccessToken,
 	}
 
@@ -100,7 +100,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	h.cookieConfig.SetRefreshToken(c, refreshToken)
 
 	ans := &RegisterResponse{
-		User: tokens.User,
+		User:        tokens.User,
 		AccessToken: tokens.AccessToken,
 	}
 
@@ -109,7 +109,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userID := c.GetString("userId")
-	
+
 	if userID == "" {
 		utils.ErrorResponse(c, http.StatusForbidden, "пользователь не авторизован", errors.New("wrong get userId as query param"))
 		return
@@ -157,7 +157,6 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	utils.SuccessResponseWithoutBody(c, http.StatusOK, "Пароль успешно изменен. Пожалуйста, авторизуйтесь заново")
 }
 
-
 func (h *AuthHandler) GetProfile(c *gin.Context) {
 	userId := c.GetString("userId")
 
@@ -193,6 +192,6 @@ func (h *AuthHandler) CheckAuth(c *gin.Context) {
 
 	utils.SuccessResponse(c, http.StatusOK, "авторизован", gin.H{
 		"authenticated": true,
-		"user": user,
+		"user":          user,
 	})
 }

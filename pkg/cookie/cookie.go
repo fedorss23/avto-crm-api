@@ -46,9 +46,9 @@ func (c *CookieConfig) SetRefreshToken(ctx *gin.Context, token string) {
 
 func (c *CookieConfig) ClearAuthCookies(ctx *gin.Context) {
 	ctx.SetCookie(
-		"access_token", 
-		"", 
-		-1, 
+		"access_token",
+		"",
+		-1,
 		c.Path,
 		c.Domain,
 		c.Secure,
@@ -56,9 +56,9 @@ func (c *CookieConfig) ClearAuthCookies(ctx *gin.Context) {
 	)
 
 	ctx.SetCookie(
-		"refresh_token", 
-		"", 
-		-1, 
+		"refresh_token",
+		"",
+		-1,
 		c.Path,
 		c.Domain,
 		c.Secure,
@@ -69,7 +69,6 @@ func (c *CookieConfig) ClearAuthCookies(ctx *gin.Context) {
 func (c *CookieConfig) GetAccessToken(ctx *gin.Context) (string, error) {
 	return ctx.Cookie("access_token")
 }
-
 
 func (c *CookieConfig) GetRefreshToken(ctx *gin.Context) (string, error) {
 	return ctx.Cookie("refresh_token")
