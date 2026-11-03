@@ -3,6 +3,7 @@ package middleware
 import (
 	"avto-crm-api/internal/modules/company"
 	"avto-crm-api/internal/utils"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type UserClaims struct {
@@ -131,8 +133,8 @@ func UserAuthMiddleware(secret string) gin.HandlerFunc {
 	}
 }
 
-func UserAuthMiddlewareWithCompany(secret string, findCompany func(ownerId, companyId string) (*company.Company, error)) gin.HandlerFunc {
-	return func(c *gin.Context)  {
+func UserAuthMiddlewareWithCompany(secret string, findCompany func(ownerId, companyId uuid.UUID) (*company.Company, error)) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		if c.Request.Method == http.MethodOptions {
 			c.Next()
 			return
@@ -165,7 +167,31 @@ func UserAuthMiddlewareWithCompany(secret string, findCompany func(ownerId, comp
 		log.Println(claims.UserID)
 		log.Println(companyId)
 
-		if _, err := findCompany(claims.UserID, companyId); err != nil {
+		oid, err := uuid.Parse(claims.UserID)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, APIResponse{
+				Success: false,
+				Message: "userId error",
+				Data: utils.ErrorResponseData{
+					Err:  errors.New("invalid user id").Error(),
+					Code: utils.ValidationErrorCode,
+				},
+			})
+		}
+
+		cid, err := uuid.Parse(companyId)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, APIResponse{
+				Success: false,
+				Message: "companyId error",
+				Data: utils.ErrorResponseData{
+					Err:  errors.New("invalid company id").Error(),
+					Code: utils.ValidationErrorCode,
+				},
+			})
+		}
+
+		if _, err := findCompany(oid, cid); err != nil {
 			c.AbortWithStatusJSON(utils.ErrorToHTTPStatus(err), APIResponse{
 				Success: false,
 				Message: "company not found",
@@ -211,7 +237,7 @@ func ManagerAuthMiddleware(secret string) gin.HandlerFunc {
 	}
 }
 
-func StandartMiddlewareWithCompany(secret string, findCompany func(ownerId, companyId string) (*company.Company, error)) gin.HandlerFunc {
+func StandartMiddlewareWithCompany(secret string, findCompany func(ownerId, companyId uuid.UUID) (*company.Company, error)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method == http.MethodOptions {
 			c.Next()
@@ -255,7 +281,31 @@ func StandartMiddlewareWithCompany(secret string, findCompany func(ownerId, comp
 		log.Println(claims.UserID)
 		log.Println(companyId)
 
-		if _, err := findCompany(claims.UserID, companyId); err != nil {
+		oid, err := uuid.Parse(claims.UserID)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, APIResponse{
+				Success: false,
+				Message: "userId error",
+				Data: utils.ErrorResponseData{
+					Err:  errors.New("invalid user id").Error(),
+					Code: utils.ValidationErrorCode,
+				},
+			})
+		}
+
+		cid, err := uuid.Parse(companyId)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, APIResponse{
+				Success: false,
+				Message: "companyId error",
+				Data: utils.ErrorResponseData{
+					Err:  errors.New("invalid company id").Error(),
+					Code: utils.ValidationErrorCode,
+				},
+			})
+		}
+
+		if _, err := findCompany(oid, cid); err != nil {
 			c.AbortWithStatusJSON(utils.ErrorToHTTPStatus(err), APIResponse{
 				Success: false,
 				Message: "company not found",
@@ -275,11 +325,81 @@ func StandartMiddlewareWithCompany(secret string, findCompany func(ownerId, comp
 	}
 }
 
+func StandartMiddleware(secret string, findCompany func(ownerId, companyId uuid.UUID) (*company.Company, error)) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodOptions {
+			c.Next()
+			return
+		}
 
-// 0d35b31c-76dd-42b9-b2fd-bd5b69427f0b
-// 0d35b31c-76dd-42b9-b2fd-bd5b69427f0b
-// 0d35b31c-76dd-42b9-b2fd-bd5b69427f0b
+		claims, ok := checkTokenAndUserClaims(c, secret)
+		if !ok {
+			mclaims, ok := checkTokenAndManagerClaims(c, secret)
+			log.Println(mclaims.ManagerID, ok)
 
-// 04cfa108-2647-433d-8469-4d80125ff627
-// 04cfa108-2647-433d-8469-4d80125ff627
-// 04cfa108-2647-433d-8469-4d80125ff627
+			if !ok {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, APIResponse{
+					Success: false,
+					Message: "invalid token",
+					Error:   utils.ErrUnauthorized,
+				})
+				return
+			}
+			c.Set("userId", mclaims.ManagerID)
+			c.Set("role", mclaims.Role)
+			c.Set("companyId", mclaims.CompanyID)
+			c.Set("type", "manager")
+			c.Next()
+			return
+		}
+
+		companyId, exists := c.GetQuery("companyId")
+
+		log.Println(claims.UserID)
+		log.Println(companyId)
+
+		oid, err := uuid.Parse(claims.UserID)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, APIResponse{
+				Success: false,
+				Message: "userId error",
+				Data: utils.ErrorResponseData{
+					Err:  errors.New("invalid user id").Error(),
+					Code: utils.ValidationErrorCode,
+				},
+			})
+		}
+
+		if exists && companyId != "" {
+			cid, err := uuid.Parse(companyId)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusBadRequest, APIResponse{
+					Success: false,
+					Message: "companyId error",
+					Data: utils.ErrorResponseData{
+						Err:  errors.New("invalid company id").Error(),
+						Code: utils.ValidationErrorCode,
+					},
+				})
+			}
+
+			if _, err := findCompany(oid, cid); err != nil {
+				c.AbortWithStatusJSON(utils.ErrorToHTTPStatus(err), APIResponse{
+					Success: false,
+					Message: "company not found",
+					Data: utils.ErrorResponseData{
+						Err:  utils.ErrRecordNotFound.Error(),
+						Code: utils.CodeByError(err),
+					},
+				})
+				return
+			}
+			c.Set("companyId", companyId)
+		}
+
+		c.Set("userId", claims.UserID)
+		c.Set("email", claims.Email)
+		c.Set("type", "owner")
+		c.Next()
+	}
+}

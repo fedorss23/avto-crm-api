@@ -169,9 +169,19 @@ func (s *AuthManagersService) Login(req *LoginRequest) (*AuthResponse, error) {
 func (s *AuthManagersService) ChangePassword(oldPassword, newPassword, managerId, ownerId, companyId string) (*ManagerResponse, error) {
 	var resp *ManagerResponse
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		_, err := s.companyRepo.FindById(ownerId, companyId)
+		oid, err := uuid.Parse(ownerId)
 		if err != nil {
 			return err
+		}
+
+		cid, err := uuid.Parse(companyId)
+		if err != nil {
+			return err
+		}
+
+		_, errf := s.companyRepo.FindById(oid, cid)
+		if errf != nil {
+			return errf
 		}
 
 		oldManager, err := s.managerRepo.FindById(managerId)

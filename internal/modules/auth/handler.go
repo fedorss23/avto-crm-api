@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"avto-crm-api/internal/blacklist"
 	"avto-crm-api/internal/utils"
 	"avto-crm-api/pkg/cookie"
 	"net/http"
@@ -13,14 +12,12 @@ import (
 type AuthHandler struct {
 	service          *AuthService
 	cookieConfig     *cookie.CookieConfig
-	blacklistService *blacklist.BlacklistService
 }
 
-func NewAuthHandler(service *AuthService, cfg *cookie.CookieConfig, blacklistService *blacklist.BlacklistService) *AuthHandler {
+func NewAuthHandler(service *AuthService, cfg *cookie.CookieConfig) *AuthHandler {
 	return &AuthHandler{
 		service:          service,
 		cookieConfig:     cfg,
-		blacklistService: blacklistService,
 	}
 }
 
@@ -61,7 +58,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	authresp, err := h.service.Login(&req, c.ClientIP())
 
 	if err != nil {
-		utils.CallErrrorResponse(c, err)
+		utils.CallErrorResponse(c, err)
 		return
 	}
 
@@ -76,34 +73,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 func (h *AuthHandler) Refresh(c *gin.Context) {
-	refreshToken, refreshTtl, err := h.getTtlForRefreshToken(c)
-	if err != nil {
-		return
-	}
+	refreshToken, err := h.cookieConfig.GetRefreshToken(c)
 
 	tokens, err := h.service.RefreshToken(refreshToken)
 
 	if err != nil {
-		utils.CallErrrorResponse(c, err)
+		utils.CallErrorResponse(c, err)
 		return
 	}
 
 	h.cookieConfig.SetRefreshToken(c, tokens.RefreshToken)
-
-	accessToken, accessTtl, err := h.getTtlForAccessToken(c)
-	if err != nil {
-		return
-	}
-
-	if err := h.blacklistService.Add(c.Request.Context(), refreshToken, refreshTtl); err != nil {
-		utils.CallErrrorResponse(c, err)
-		return
-	}
-
-	if err := h.blacklistService.Add(c.Request.Context(), accessToken, accessTtl); err != nil {
-		utils.CallErrrorResponse(c, err)
-		return
-	}
 
 	ans := &AuthResponseWithoutRefreshToken{
 		User:        tokens.User,
@@ -157,29 +136,11 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	refreshToken, refreshTtl, err := h.getTtlForRefreshToken(c)
-	if err != nil {
-		return
-	}
-
-	accessToken, accessTtl, err := h.getTtlForAccessToken(c)
-	if err != nil {
-		return
-	}
+	refreshToken, err := h.cookieConfig.GetRefreshToken(c)
 
 	data, err := h.service.ChangePassword(userId, refreshToken, &req)
 
 	if err != nil {
-		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
-		return
-	}
-
-	if err := h.blacklistService.Add(c.Request.Context(), refreshToken, refreshTtl); err != nil {
-		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
-		return
-	}
-
-	if err := h.blacklistService.Add(c.Request.Context(), accessToken, accessTtl); err != nil {
 		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), err.Error(), err, utils.CodeByError(err))
 		return
 	}

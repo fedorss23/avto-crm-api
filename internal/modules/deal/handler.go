@@ -3,7 +3,6 @@ package deal
 import (
 	"avto-crm-api/internal/utils"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +21,7 @@ func NewDealHandler(dealService *DealService) *DealHandler {
 func (h *DealHandler) CreateFullDeal(c *gin.Context) {
 	var req CreateDealRequest
 
-	scope, err := h.getDealScopeWithQueryManager(c)
+	scope, err := utils.GetAuthScopeWithManager(c)
 	if err != nil {
 		return
 	}
@@ -47,7 +46,7 @@ func (h *DealHandler) CreateFullDeal(c *gin.Context) {
 func (h *DealHandler) Update(c *gin.Context) {
 	var req UpdateDealRequest
 
-	scope, err := h.getDealScope(c)
+	scope, err := utils.GetAuthScope(c)
 	if err != nil {
 		return
 	}
@@ -75,7 +74,7 @@ func (h *DealHandler) Update(c *gin.Context) {
 }
 
 func (h *DealHandler) GetTotalByStatus(c *gin.Context) {
-	scope, err := h.getDealScopeWithQueryManager(c)
+	scope, err := utils.GetAuthScopeWithManager(c)
 	if err != nil {
 		return
 	}
@@ -107,7 +106,7 @@ func (h *DealHandler) GetTotalByStatus(c *gin.Context) {
 }
 
 func (h *DealHandler) FindList(c *gin.Context) {
-	scope, err := h.getDealScopeWithQueryManager(c)
+	scope, err := utils.GetAuthScopeWithManager(c)
 	if err != nil {
 		return
 	}
@@ -142,13 +141,13 @@ func (h *DealHandler) FindList(c *gin.Context) {
 	clientId, _ := c.GetQuery("clientId")
 
 	deals, total, err := h.dealService.FindDealByOwnerId(&DealFilters{
-		scope: scope,
-		clientId:  clientId,
-		page:      page,
-		limit:     limit,
-		status:    status,
-		search:    search,
-		isFull:    isFull,
+		scope:    scope,
+		clientId: clientId,
+		page:     page,
+		limit:    limit,
+		status:   status,
+		search:   search,
+		isFull:   isFull,
 	})
 
 	if err != nil {
@@ -167,7 +166,7 @@ func (h *DealHandler) FindList(c *gin.Context) {
 }
 
 func (h *DealHandler) Delete(c *gin.Context) {
-	scope, err := h.getDealScope(c)
+	scope, err := utils.GetAuthScope(c)
 	if err != nil {
 		return
 	}
@@ -196,7 +195,7 @@ func (h *DealHandler) FindById(c *gin.Context) {
 		return
 	}
 
-	scope, err := h.getDealScope(c)
+	scope, err := utils.GetAuthScope(c)
 	if err != nil {
 		return
 	}
@@ -213,46 +212,3 @@ func (h *DealHandler) FindById(c *gin.Context) {
 	})
 }
 
-func (h *DealHandler) getDealScope(c *gin.Context) (*DealScope, error) {
-	var scope DealScope
-
-	var userId string
-	userType, err := utils.GetUserId(c, &userId)
-	if err != nil {
-		return nil, err
-	}
-
-	scope.CompanyId = c.GetString("companyId")
-
-	if userType == "manager" {
-		scope.ManagerId = &userId
-	}
-
-	return &scope, nil
-}
-
-func (h *DealHandler) getDealScopeWithQueryManager(c *gin.Context) (*DealScope, error) {
-	var scope DealScope
-
-	var userId string
-	userType, err := utils.GetUserId(c, &userId)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Println(userId)
-
-	scope.CompanyId = c.GetString("companyId")
-	
-	if userType == "manager" {
-		scope.ManagerId = &userId
-	} else {
-		manager, ok := c.GetQuery("managerId")
-
-		if ok && manager != "" {
-			scope.ManagerId = &manager
-		} 
-	}
-
-	return &scope, nil
-}

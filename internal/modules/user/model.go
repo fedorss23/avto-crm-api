@@ -15,8 +15,8 @@ type User struct {
 	Password string `gorm:"" json:"-"`
 
 	Name string `gorm:"not null" json:"name"`
-	MiddleName string `gorm:"not null" json:"middleName"`
-	LastName *string `json:"lastName"`
+	MiddleName *string `gorm:"not null" json:"middleName"`
+	LastName string `json:"lastName"`
 
 	Company []company.Company `gorm:"foreignKey:OwnerID" json:"companyId"`
 

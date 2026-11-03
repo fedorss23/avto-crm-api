@@ -10,7 +10,7 @@ import (
 
 type Company struct {
 	ID uuid.UUID `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	Name string `gorm:"not null" json:"name"`
+	Name string `gorm:"not null;unique" json:"name"`
 
 	TypeCompany string `gorm:"not null" json:"type"`
 

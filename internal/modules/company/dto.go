@@ -8,3 +8,8 @@ type CreateCompanyRequest struct {
 type CreateCompanyResponse struct {
 	Company Company `json:"company"`
 }
+
+type UpdateCompanyRequest struct {
+	TypeCompany *string `json:"typeCompany"`
+	Name *string `json:"name"`
+}
