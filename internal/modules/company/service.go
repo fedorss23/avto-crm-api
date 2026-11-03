@@ -1,14 +1,22 @@
 package company
 
-import "github.com/google/uuid"
+import (
+	"avto-crm-api/internal/utils"
+	"errors"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 type CompanyService struct {
 	companyRepo *CompanyRepository
+	db *gorm.DB
 }
 
-func NewCompanyService(companyRepo *CompanyRepository) *CompanyService {
+func NewCompanyService(companyRepo *CompanyRepository, db *gorm.DB) *CompanyService {
 	return &CompanyService{
 		companyRepo: companyRepo,
+		db: db,
 	}
 }
 
@@ -30,4 +38,50 @@ func (s *CompanyService) Create(req *CreateCompanyRequest, ownerId string) (*Com
 	}
 
 	return company, nil
+}
+
+func (s *CompanyService) Update(req *UpdateCompanyRequest, ownerId string, companyId string) (*Company, error) {
+	var ncompany *Company
+
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		oid, err := uuid.Parse(ownerId)
+
+		if err != nil {
+			return err
+		}
+
+		cid, err := uuid.Parse(companyId)
+
+		if err != nil {
+			return err
+		}
+
+		company, err := s.companyRepo.FindByIdForUpdate(tx, oid, cid)
+
+		updateMap := make(map[string]interface{})
+
+		if req.Name != nil {
+			_, err := s.companyRepo.FindByName(oid, *req.Name)
+
+			if err == nil {
+				return utils.ErrNameAlreadyExists
+			}
+
+			if !errors.Is(err, utils.ErrRecordNotFound) {
+				return err
+			}
+
+			updateMap["name"] = *req.Name
+		}
+
+		if req.TypeCompany != nil {
+			updateMap["typeCompany"] = *req.TypeCompany
+		} 
+
+		ncompany = company
+
+		return tx.Model(company).Updates(updateMap).Error
+	})
+
+	return ncompany, err
 }

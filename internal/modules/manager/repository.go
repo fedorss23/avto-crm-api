@@ -62,9 +62,9 @@ func (r *ManagerRepository) GetFreeManager(tx *gorm.DB, companyId uuid.UUID) (st
 	var manager Manager
 	err := tx.Model(&Manager{}).
 		Joins("LEFT JOIN deals ON deals.manager_id = managers.id").
-		Where("managers.company_id = ?::uuid", companyId).
+		Where("managers.company_id = ?", companyId).
 		Group("managers.id").
-		Order("COUNT(deals.id) DESC",).
+		Order("COUNT(deals.id) ASC",).
 		First(&manager).Error
 
 	if err != nil {

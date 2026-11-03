@@ -75,6 +75,6 @@ func ValidationErrorResponse(c *gin.Context, errors map[string]string) {
 	})
 }
 
-func CallErrrorResponse(c *gin.Context, err error) {
+func CallErrorResponse(c *gin.Context, err error) {
 	ErrorResponse(c, ErrorToHTTPStatus(err), err.Error(), err, CodeByError(err))
 }

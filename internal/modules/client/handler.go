@@ -12,6 +12,11 @@ type ClientHandler struct {
 	clientService *ClientService
 }
 
+type ClientScope struct {
+	CompanyId string
+	ManagerId *string
+}
+
 func NewClientHandler(clientService *ClientService) *ClientHandler {
 	return &ClientHandler{
 		clientService: clientService,
@@ -19,50 +24,82 @@ func NewClientHandler(clientService *ClientService) *ClientHandler {
 }
 
 func (h *ClientHandler) FindById(c *gin.Context) {
-	var clientId string
+	var clientId string 
 	if err := utils.GetParam(c, "clientId", &clientId); err != nil {
 		return
 	}
 
-	var ownerId string
-	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+	scope, err := utils.GetAuthScope(c)
+
+	if err != nil {
 		return
 	}
 
-	client, err := h.clientService.FindById(clientId, ownerId)
+	client, err := h.clientService.FindById(clientId, scope)
 
 	if err != nil {
-		utils.ErrorResponse(c, ErrorToHTTPStatus(err), err.Error(), err, CodeByError(err))
+		utils.CallErrorResponse(c, err)
+		return
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, "successfully getting client", client)
 }
 
-func (h *ClientHandler) FindListByOwnerId(c *gin.Context) {
+func (h *ClientHandler) FindList(c *gin.Context) {
 	var page int
-	if err := utils.GetNumberQuery(c, "page", &page, 1, pageErrorCode); err != nil {
+	if err := utils.GetNumberQuery(c, "page", &page, 1, utils.PageErrorCode); err != nil {
 		return
 	}
 
 	var limit int
-	if err := utils.GetNumberQuery(c, "limit", &limit, 1, limitErrorCode); err != nil {
+	if err := utils.GetNumberQuery(c, "limit", &limit, 10, utils.LimitErrorCode); err != nil {
 		return
 	}
 
-	var ownerId string
-	if err := utils.GetOwnerId(c, &ownerId); err != nil {
-		return
-	}
-
-	clients, total, err := h.clientService.FindListByOwnerId(ownerId, page, limit)
+	scope, err := utils.GetAuthScopeWithManager(c)
 
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error(), err, CodeByError(err))
+		return
+	}
+
+	clients, total, err := h.clientService.FindList(page, limit, scope)
+
+	if err != nil {
+		utils.CallErrorResponse(c, err)
 		return
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("Clients successfully found: %d", total), &ClientWithTotal{
 		Clients: clients,
 		Total: total,
+	})
+}
+
+func (h *ClientHandler) Update(c *gin.Context) {
+	var req UpdateClientRequest
+	if err := c.ShouldBindJSON(req); err != nil {
+		errs := utils.ParseValidationErrors(err)
+		utils.ValidationErrorResponse(c, errs)
+		return
+	}
+
+	var clientId string
+	if err := utils.GetParam(c, "clientId", &clientId); err != nil {
+		return
+	}
+
+	scope, err := utils.GetAuthScope(c)
+	if err != nil {
+		return
+	}
+
+	client, err := h.clientService.Update(&req, clientId, scope)
+	if err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "client successfully updated", OneClientResponse{
+		Client: *client,
 	})
 }

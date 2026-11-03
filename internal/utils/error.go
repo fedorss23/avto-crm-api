@@ -33,6 +33,7 @@ var (
 	ErrPasswordIncorrectRegister = errors.New("invalid password")
 
 	ErrNotManagers = errors.New("ou should have at least one manager")
+	ErrNameAlreadyExists = errors.New("name already exists")
 )
 
 const (
@@ -66,7 +67,7 @@ func CodeByError(err error) string {
 	case errors.Is(err, ErrForbidden):
 		return ForbiddenCode
 
-	case errors.Is(err, ErrEmailAlredyExists), errors.Is(err, ErrConflict), errors.Is(err, ErrLoginAlreadyExists), errors.Is(err, ErrNotManagers):
+	case errors.Is(err, ErrEmailAlredyExists), errors.Is(err, ErrConflict), errors.Is(err, ErrLoginAlreadyExists), errors.Is(err, ErrNotManagers), errors.Is(err, ErrNameAlreadyExists):
 		return ConflictCode
 
 	case errors.Is(err, ErrUnauthorized):
@@ -134,7 +135,8 @@ func ErrorToHTTPStatus(err error) int {
 		errors.Is(err, ErrEmailAlredyExists),
 		errors.Is(err,ErrLoginAlreadyExists),
 		errors.Is(err, ErrLastStage),
-		errors.Is(err, ErrNotManagers):
+		errors.Is(err, ErrNotManagers),
+		errors.Is(err, ErrNameAlreadyExists):
 		return http.StatusConflict
 
 	default:

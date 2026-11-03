@@ -44,32 +44,32 @@ func NewDealService(
 	}
 }
 
-func (s *DealService) GetTotalByStatus(scope *DealScope, status string) (int64, error) {
+func (s *DealService) GetTotalByStatus(scope *utils.AuthScope, status string) (int64, error) {
 	return s.dealRepo.GetTotalForStatus(scope, status)
 }
 
-func (s *DealService) CreateFullDeal(req *CreateDealRequest, scope *DealScope) (*Deal, error) {
+func (s *DealService) CreateFullDeal(req *CreateDealRequest, scope *utils.AuthScope) (*Deal, error) {
 	var deal *Deal
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		cid, err := uuid.Parse(scope.CompanyId)
-		if err != nil {
-			return err
+		if scope.CompanyId == nil {
+			return utils.ToQueryError("companyId")
 		}
 
 		if scope.ManagerId == nil {
-			id, err := s.managerRepo.GetFreeManager(tx, cid)
+			id, err := s.managerRepo.GetFreeManager(tx, *scope.CompanyId)
 			if err != nil {
 				if errors.Is(err, utils.ErrRecordNotFound) {
 					return utils.ErrNotManagers
 				}
 				return err
 			}
-			scope.ManagerId = &id
-		}
 
-		mid, err := uuid.Parse(*scope.ManagerId)
-		if err != nil {
-			return err
+			mid, err := uuid.Parse(id)
+			if err != nil {
+				return err
+			}
+
+			scope.ManagerId = &mid
 		}
 
 		if len(req.Pipeline.Stages) == 0 {
@@ -95,9 +95,11 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, scope *DealScope) (
 
 		newCar := &car.Car{Model: req.Car.Model}
 
+
 		newClient := &client.Client{
 			Name:    req.Client.Name,
-			OwnerID: mid,
+			ManagerID: *scope.ManagerId,
+			CompanyID: *scope.CompanyId,
 		}
 
 		if req.Client.Email != nil {
@@ -108,13 +110,21 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, scope *DealScope) (
 			newClient.Phone = req.Client.Phone
 		}
 
+		if err := s.pipeRepo.Create(tx, newPipeline); err != nil {
+			return err
+		}
+
+		firstStage := newPipeline.Stages[0]
+		
 		deal = &Deal{
 			Name:      req.Name,
-			Pipeline:  newPipeline,
+			PipelineID: &newPipeline.ID,
+			CurrentStageId: &firstStage.ID,
+			CurrentStageName: &firstStage.Name,
 			Client:    newClient,
 			Car:       newCar,
-			ManagerID: mid,
-			CompanyID: cid,
+			ManagerID: *scope.ManagerId,
+			CompanyID: *scope.CompanyId,
 			Term:      req.Term,
 			DueDate:   time.Now().AddDate(0, 0, req.Term),
 			Total:     req.Total,
@@ -124,22 +134,17 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, scope *DealScope) (
 			return err
 		}
 
-		firstStage := deal.Pipeline.Stages[0]
-
-		return tx.Model(deal).Updates(map[string]interface{}{
-			"current_stage_id":   &firstStage.ID,
-			"current_stage_name": &firstStage.Name,
-		}).Error
+		return nil
 	})
 
 	return deal, err
 }
 
-func (s *DealService) Update(req *UpdateDealRequest, dealId string, scope *DealScope) (*Deal, error) {
+func (s *DealService) Update(req *UpdateDealRequest, dealId string, scope *utils.AuthScope) (*Deal, error) {
 	var deal *Deal
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var err error
-		deal, err = s.dealRepo.FindFullForUpdate(tx, dealId, scope)
+		deal, err = s.dealRepo.FindForUpdate(tx, dealId, scope)
 
 		if err != nil {
 			return err
@@ -204,10 +209,32 @@ func (s *DealService) FindDealByOwnerId(filters *DealFilters) ([]Deal, int64, er
 	return s.dealRepo.FindList(filters)
 }
 
-func (s *DealService) Delete(dealId string, scope *DealScope) error {
-	return s.dealRepo.Delete(dealId, scope)
+func (s *DealService) Delete(dealId string, scope *utils.AuthScope) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		deal, err := s.dealRepo.FindForUpdate(tx, dealId, scope)
+
+		if err != nil {
+			return err
+		}
+
+		for _, i := range deal.Pipeline.Stages {
+			if err := s.stageRepo.Delete(tx, i.ID, scope); err != nil {
+				return err
+			}
+		}
+
+		if err := s.pipeRepo.Delete(tx, *deal.PipelineID, scope); err != nil {
+			return err
+		}
+
+		if err := s.clientRepo.Delete(tx, *deal.ClientID, scope); err != nil {
+			return err
+		}
+
+		return tx.Delete(&deal).Error
+	})
 }
 
-func (s *DealService) FindById(dealId string, scope *DealScope, isFull bool) (*Deal, error) {
+func (s *DealService) FindById(dealId string, scope *utils.AuthScope, isFull bool) (*Deal, error) {
 	return s.dealRepo.FindById(dealId, scope, isFull)
 }

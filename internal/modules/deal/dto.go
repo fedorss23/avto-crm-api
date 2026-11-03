@@ -1,6 +1,7 @@
 package deal
 
 import (
+	"avto-crm-api/internal/utils"
 	"time"
 )
 
@@ -75,7 +76,7 @@ type TotalData struct {
 }
 
 type DealFilters struct {
-	scope *DealScope
+	scope *utils.AuthScope
 	page int
 	limit int
 	isFull bool
@@ -86,9 +87,4 @@ type DealFilters struct {
 
 type OneDealResponse struct {
 	Deal Deal `json:"deal"`
-}
-
-type DealScope struct {
-	CompanyId string
-	ManagerId *string
 }

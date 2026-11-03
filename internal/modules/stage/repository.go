@@ -1,6 +1,8 @@
 package stage
 
 import (
+	"avto-crm-api/internal/utils"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -28,6 +30,26 @@ func (r *StageRepository) Update(data map[string]interface{}, stageId string, ow
 	return &stage, nil
 }
 
-func (r *StageRepository) Delete(tx *gorm.DB, stageID uuid.UUID) error {
-	return tx.Delete(&Stage{}, "WHERE id = ?", stageID).Error
+func (r *StageRepository) Delete(tx *gorm.DB, stageId uuid.UUID, scope *utils.AuthScope) error {
+	query := tx.Where("id = ?", stageId)
+
+	if scope.CompanyId != nil {
+		query = query.Where("company_id = ?", *scope.CompanyId)
+	}
+
+	if scope.ManagerId != nil {
+		query = query.Where("manager_id = ?", *scope.ManagerId)
+	}
+
+	result := query.Delete(&Stage{})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return utils.ErrRecordNotFound
+	}
+
+	return nil
 }

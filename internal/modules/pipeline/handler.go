@@ -20,19 +20,19 @@ func NewPipelineHandler(pipeService *PipelineService) *PipelineHandler {
 
 func (h *PipelineHandler) FindList(c *gin.Context) {
 	var page int
-	if err := utils.GetNumberQuery(c, "page", &page, 1, pageErrorCode); err != nil {
+	if err := utils.GetNumberQuery(c, "page", &page, 1, utils.PageErrorCode); err != nil {
 		return
 	}
 
 	var limit int
-	if err := utils.GetNumberQuery(c, "limit", &limit, 10, limitErrorCode); err != nil {
+	if err := utils.GetNumberQuery(c, "limit", &limit, 10, utils.LimitErrorCode); err != nil {
 		return
 	}
 
 	pipelines, total, err := h.pipeService.FindAll(page, limit)
 
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error(), err, CodeByError(err))
+		utils.CallErrorResponse(c, err)
 		return
 	}
 
@@ -42,4 +42,85 @@ func (h *PipelineHandler) FindList(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, fmt.Sprintf("Pipelines successfully found: %d", total), data)
+}
+
+func (h *PipelineHandler) Update(c *gin.Context) {
+	var req UpdatePipelineRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errs := utils.ParseValidationErrors(err)
+		utils.ValidationErrorResponse(c, errs)
+		return
+	}
+
+	var pipelineId string
+	if err := utils.GetParam(c, "pipelineId", &pipelineId); err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	scope, err := utils.GetAuthScope(c)
+	if err != nil {
+		return
+	}
+
+	pipeline, err := h.pipeService.Update(pipelineId, &req, scope)
+	if err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "pipeline successfully updated", pipeline)
+}
+
+func (h *PipelineHandler) AddStages(c *gin.Context) {
+	var req AddPipelineStages
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errs := utils.ParseValidationErrors(err)
+		utils.ValidationErrorResponse(c, errs)
+		return
+	}
+
+	var pipelineId string
+	if err := utils.GetParam(c, "pipelineId", &pipelineId); err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	scope, err := utils.GetAuthScope(c)
+	if err != nil {
+		return
+	}
+
+	pipeline, err := h.pipeService.AddStages(pipelineId, &req, scope)
+	if err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "pipeline successfully updated", pipeline)
+}
+
+func (h *PipelineHandler) DeleteStage(c *gin.Context) {
+	var stageId string
+	if err := utils.GetStringRequiredQuery(c, "stageId", &stageId); err != nil {
+		return
+	}
+
+	var pipelineId string
+	if err := utils.GetParam(c, "pipelineId", &pipelineId); err != nil {
+		return
+	}
+
+	scope, err := utils.GetAuthScope(c)
+	if err != nil {
+		return
+	}
+
+	pipeline, err := h.pipeService.DeleteStage(pipelineId, stageId, scope)
+	if err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "stage successfully deleted", pipeline)
 }

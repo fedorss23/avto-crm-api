@@ -33,11 +33,55 @@ func (h *CompanyHandler) Create(c *gin.Context) {
 	company, err := h.companyService.Create(&req, ownerId)
 
 	if err != nil {
-		utils.CallErrrorResponse(c, err)
+		utils.CallErrorResponse(c, err)
 		return
 	}
 
 	utils.SuccessResponse(c, http.StatusCreated, "company successfully created", &CreateCompanyResponse{
 		Company: *company,
 	})
+}
+
+func (h *CompanyHandler) Update(c *gin.Context) {
+	var req UpdateCompanyRequest
+	if err := c.ShouldBindJSON(&req); err != nil{
+		errs := utils.ParseValidationErrors(err)
+		utils.ValidationErrorResponse(c, errs)
+		return
+	}
+
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+		return
+	}
+
+	var companyId string
+	if err := utils.GetParam(c, "companyId", &companyId); err != nil {
+		return
+	}
+
+	company, err := h.companyService.Update(&req, ownerId, companyId)
+
+	if err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "company successfully updated", &CreateCompanyResponse{
+		Company: *company,
+	})
+}
+
+func (h *CompanyHandler) Delete(c *gin.Context) {
+	var ownerId string
+	if err := utils.GetOwnerId(c, &ownerId); err != nil {
+		return
+	}
+
+	var companyId string
+	if err := utils.GetParam(c, "companyId", &companyId); err != nil {
+		return
+	}
+
+	
 }

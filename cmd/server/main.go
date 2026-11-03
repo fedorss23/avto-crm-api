@@ -1,7 +1,6 @@
 package main
 
 import (
-	"avto-crm-api/internal/blacklist"
 	"avto-crm-api/internal/config"
 	"avto-crm-api/internal/database"
 	"avto-crm-api/internal/modules/auth"
@@ -14,7 +13,6 @@ import (
 	"avto-crm-api/internal/modules/pipeline"
 	"avto-crm-api/internal/modules/stage"
 	"avto-crm-api/internal/modules/user"
-	"avto-crm-api/internal/rdb"
 	"avto-crm-api/pkg/cookie"
 	"avto-crm-api/pkg/jwt"
 	"avto-crm-api/pkg/middleware"
@@ -63,11 +61,6 @@ func main() {
 		log.Fatalf("Error with connecting to database")
 	}
 
-	rdbClient := rdb.NewRedisClient(cfg.RedisHost + ":" + cfg.RedisPort, cfg.RedisPassword, 0)
-
-
-	blacklist := blacklist.NewBlacklistService(rdbClient)
-
 	userRepo := user.NewUserRepository(db)
 	dealRepo := deal.NewDealRepository(db)
 	carRepo := car.NewCarRepository(db)
@@ -88,15 +81,15 @@ func main() {
 	authService := auth.NewAuthService(userRepo, jwtMaker, serviceConfig, db)
 	dealService := deal.NewDealService(db, dealRepo, carRepo, pipelineRepo, stageRepo, clientRepo, managerRepo)
 	carService := car.NewCarService(carRepo)
-	clientSerivce := client.NewClientService(clientRepo)
-	pipelineService := pipeline.NewPipelineService(pipelineRepo, db)
+	clientSerivce := client.NewClientService(clientRepo, db)
+	pipelineService := pipeline.NewPipelineService(pipelineRepo, stageRepo, db)
 	userService := user.NewUserService(userRepo)
-	companyService := company.NewCompanyService(companyRepo)
+	companyService := company.NewCompanyService(companyRepo, db)
 
 	cookieConfig := cookie.NewCookieConfig(cfg.Domain, cfg.Secure)
 
 	authManagerHandler := authmanagers.NewAuthManagersHandler(authManagerService, cookieConfig)
-	authHandler := auth.NewAuthHandler(authService, cookieConfig, blacklist)
+	authHandler := auth.NewAuthHandler(authService, cookieConfig)
 	dealHandler := deal.NewDealHandler(dealService)
 	carHandler := car.NewCarHandler(carService)
 	clientHandler := client.NewClientHandler(clientSerivce)
@@ -109,25 +102,6 @@ func main() {
 			"status":  "OK",
 			"time":    time.Now().Format(time.RFC3339),
 			"service": "service working",
-		})
-	})
-
-	router.GET("/redis-check", func(c *gin.Context) {
-		err := rdbClient.Ping(c.Request.Context())
-
-		if err != nil {
-			c.JSON(500, gin.H{
-				"status": "error",
-				"time": time.Now().Format(time.RFC3339),
-				"error": err.Error(),
-			})
-			return
-		}
-
-		c.JSON(200, gin.H{
-			"status": "ok",
-			"time": time.Now().Format(time.RFC3339),
-			"message": "pong",
 		})
 	})
 
@@ -186,16 +160,20 @@ func main() {
 		}
 
 		client := api.Group("/client")
-		client.Use(middleware.UserAuthMiddleware(cfg.JWTSecret))
+		client.Use(middleware.StandartMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
 		{
-			client.GET(":clientId", clientHandler.FindById)
-			client.GET("/by-owner", clientHandler.FindListByOwnerId)
+			client.GET("/:clientId", clientHandler.FindById)
+			client.GET("", clientHandler.FindList)
+			client.PUT("/:clientId", clientHandler.Update)
 		}
 
 		pipeline := api.Group("/pipeline")
-		pipeline.Use(middleware.UserAuthMiddleware(cfg.JWTSecret))
+		pipeline.Use(middleware.StandartMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
 		{
 			pipeline.GET("", pipelineHandler.FindList)
+			pipeline.PUT("", pipelineHandler.Update)
+			pipeline.POST("/:pipelineId/stages", pipelineHandler.AddStages)
+			pipeline.DELETE("/:pipelineId/stages", pipelineHandler.DeleteStage)
 		}
 
 		users := api.Group("/users")

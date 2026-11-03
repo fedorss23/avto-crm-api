@@ -32,7 +32,7 @@ func (h *AuthManagersHandler) Login(c *gin.Context) {
 	resp, err := h.authMService.Login(&req)
 
 	if err != nil {
-		utils.CallErrrorResponse(c, err)
+		utils.CallErrorResponse(c, err)
 		return
 	}
 
@@ -64,7 +64,7 @@ func (h *AuthManagersHandler) Register(c *gin.Context) {
 	manager, err := h.authMService.Register(&req, ownerId, companyId)
 
 	if err != nil {
-		utils.CallErrrorResponse(c, err)
+		utils.CallErrorResponse(c, err)
 		return
 	}
 
@@ -77,14 +77,14 @@ func (h *AuthManagersHandler) RefreshTokens(c *gin.Context) {
 	token, err := h.cookieConfig.GetRefreshToken(c)
 
 	if err != nil {
-		utils.CallErrrorResponse(c, err)
+		utils.CallErrorResponse(c, err)
 		return
 	}
 
 	tokens, manager, err := h.authMService.RefreshToken(token)
 
 	if err != nil {
-		utils.CallErrrorResponse(c, err)
+		utils.CallErrorResponse(c, err)
 		return
 	}
 
@@ -123,7 +123,7 @@ func (h *AuthManagersHandler) ChangePassword(c *gin.Context) {
 	manager, err := h.authMService.ChangePassword(req.OldPassword, req.NewPassword, managerId, ownerId, companyId)
 
 	if err != nil {
-		utils.CallErrrorResponse(c, err)
+		utils.CallErrorResponse(c, err)
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, "password successfully changed", &RegisterResponse{
