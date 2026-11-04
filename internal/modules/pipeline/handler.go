@@ -29,7 +29,12 @@ func (h *PipelineHandler) FindList(c *gin.Context) {
 		return
 	}
 
-	pipelines, total, err := h.pipeService.FindAll(page, limit)
+	scope, err := utils.GetAuthScopeWithManager(c)
+	if err != nil {
+		return
+	}
+
+	pipelines, total, err := h.pipeService.FindAll(page, limit, scope)
 
 	if err != nil {
 		utils.CallErrorResponse(c, err)
@@ -100,6 +105,41 @@ func (h *PipelineHandler) AddStages(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, "pipeline successfully updated", pipeline)
 }
 
+func (h *PipelineHandler) UpdateStage(c *gin.Context) {
+	var stageId string
+	if err := utils.GetStringRequiredQuery(c, "stageId", &stageId); err != nil {
+		return
+	}
+
+	var pipelineId string
+	if err := utils.GetParam(c, "pipelineId", &pipelineId); err != nil {
+		return
+	}
+
+	var req UpdateStageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errs := utils.ParseValidationErrors(err)
+		utils.ValidationErrorResponse(c, errs)
+		return
+	}
+
+	scope, err := utils.GetAuthScope(c)
+	if err != nil {
+		return
+	}
+
+	stage, err := h.pipeService.UpdateStage(&req, pipelineId, stageId, scope)
+
+	if err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "stage successfully updated", UpdateStageResponse{
+		Stage: *stage,
+	})
+}
+
 func (h *PipelineHandler) DeleteStage(c *gin.Context) {
 	var stageId string
 	if err := utils.GetStringRequiredQuery(c, "stageId", &stageId); err != nil {
@@ -123,4 +163,23 @@ func (h *PipelineHandler) DeleteStage(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, "stage successfully deleted", pipeline)
+}
+
+func (h *PipelineHandler) Delete(c *gin.Context) {
+	var pipelineId string
+	if err := utils.GetParam(c, "pipelineId", &pipelineId); err != nil {
+		return
+	}
+
+	scope, err := utils.GetAuthScope(c)
+	if err != nil {
+		return
+	}
+
+	if err := h.pipeService.Delete(pipelineId, scope); err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	utils.SuccessResponseWithoutBody(c, http.StatusOK, "pipeline successfully deleted")
 }

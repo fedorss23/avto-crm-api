@@ -23,28 +23,6 @@ func NewClientHandler(clientService *ClientService) *ClientHandler {
 	}
 }
 
-func (h *ClientHandler) FindById(c *gin.Context) {
-	var clientId string 
-	if err := utils.GetParam(c, "clientId", &clientId); err != nil {
-		return
-	}
-
-	scope, err := utils.GetAuthScope(c)
-
-	if err != nil {
-		return
-	}
-
-	client, err := h.clientService.FindById(clientId, scope)
-
-	if err != nil {
-		utils.CallErrorResponse(c, err)
-		return
-	}
-
-	utils.SuccessResponse(c, http.StatusOK, "successfully getting client", client)
-}
-
 func (h *ClientHandler) FindList(c *gin.Context) {
 	var page int
 	if err := utils.GetNumberQuery(c, "page", &page, 1, utils.PageErrorCode); err != nil {
@@ -102,4 +80,23 @@ func (h *ClientHandler) Update(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, "client successfully updated", OneClientResponse{
 		Client: *client,
 	})
+}
+
+func (h *ClientHandler) Delete(c *gin.Context) {
+	var clientId string
+	if err := utils.GetParam(c, "clientId", &clientId); err != nil {
+		return
+	}
+
+	scope, err := utils.GetAuthScope(c)
+	if err != nil {
+		return
+	}
+
+	if err := h.clientService.Delete(clientId, scope); err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	utils.SuccessResponseWithoutBody(c, http.StatusOK, "client successfully deleted")
 }

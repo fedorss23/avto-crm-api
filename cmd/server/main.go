@@ -66,7 +66,7 @@ func main() {
 	carRepo := car.NewCarRepository(db)
 	clientRepo := client.NewClientRepository(db)
 	stageRepo := stage.NewStageRepository(db)
-	pipelineRepo := pipeline.NewPipelineRepository()
+	pipelineRepo := pipeline.NewPipelineRepository(db)
 	companyRepo := company.NewCompanyRepository(db)
 	managerRepo := manager.NewManagerRepository(db)
 
@@ -80,10 +80,10 @@ func main() {
 	authManagerService := authmanagers.NewAuthService(managerRepo, companyRepo, jwtMaker, &authMConfig, db)
 	authService := auth.NewAuthService(userRepo, jwtMaker, serviceConfig, db)
 	dealService := deal.NewDealService(db, dealRepo, carRepo, pipelineRepo, stageRepo, clientRepo, managerRepo)
-	carService := car.NewCarService(carRepo)
+	carService := car.NewCarService(carRepo, db)
 	clientSerivce := client.NewClientService(clientRepo, db)
 	pipelineService := pipeline.NewPipelineService(pipelineRepo, stageRepo, db)
-	userService := user.NewUserService(userRepo)
+	// userService := user.NewUserService(userRepo)
 	companyService := company.NewCompanyService(companyRepo, db)
 
 	cookieConfig := cookie.NewCookieConfig(cfg.Domain, cfg.Secure)
@@ -94,7 +94,7 @@ func main() {
 	carHandler := car.NewCarHandler(carService)
 	clientHandler := client.NewClientHandler(clientSerivce)
 	pipelineHandler := pipeline.NewPipelineHandler(pipelineService)
-	userHandler := user.NewUserHandler(userService)
+	// userHandler := user.NewUserHandler(userService)
 	companyHandler := company.NewCompanyHandler(companyService)
 
 	router.GET("/health", func(c *gin.Context) {
@@ -154,33 +154,30 @@ func main() {
 		}
 
 		car := api.Group("/car")
+		car.Use(middleware.StandartMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
 		{
 			car.GET("", carHandler.FindAll)
-			car.POST("", carHandler.Create)
+			car.PUT("", carHandler.Update)
+			car.DELETE("", carHandler.Delete)
 		}
 
 		client := api.Group("/client")
 		client.Use(middleware.StandartMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
 		{
-			client.GET("/:clientId", clientHandler.FindById)
 			client.GET("", clientHandler.FindList)
 			client.PUT("/:clientId", clientHandler.Update)
+			client.DELETE("", clientHandler.Delete)
 		}
 
 		pipeline := api.Group("/pipeline")
 		pipeline.Use(middleware.StandartMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
 		{
 			pipeline.GET("", pipelineHandler.FindList)
-			pipeline.PUT("", pipelineHandler.Update)
-			pipeline.POST("/:pipelineId/stages", pipelineHandler.AddStages)
-			pipeline.DELETE("/:pipelineId/stages", pipelineHandler.DeleteStage)
-		}
-
-		users := api.Group("/users")
-		users.Use(middleware.UserAuthMiddleware(cfg.JWTSecret))
-		{
-			users.GET("", userHandler.FindList)
-			users.DELETE(":userId", userHandler.Delete)
+			pipeline.PUT("/:pipelineId", pipelineHandler.Update)
+			pipeline.POST("/:pipelineId/stage", pipelineHandler.AddStages)
+			pipeline.DELETE("/:pipelineId/stage", pipelineHandler.DeleteStage)
+			pipeline.DELETE("", pipelineHandler.Delete)
+			pipeline.PUT("/:pipeline/stage", pipelineHandler.UpdateStage)
 		}
 
 		company := api.Group("/company")

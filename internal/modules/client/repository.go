@@ -19,7 +19,7 @@ func NewClientRepository(db *gorm.DB) *ClientRepository {
 	}
 }
 
-func (r *ClientRepository) CreateWithTransaction(tx *gorm.DB, req *Client) error {
+func (r *ClientRepository) Create(tx *gorm.DB, req *Client) error {
 	return tx.Create(req).Error
 }
 
@@ -29,14 +29,12 @@ func (r *ClientRepository) FindList(page, limit int, scope *utils.AuthScope) ([]
 
 	offset := (page - 1) * limit
 
-	query := r.db.Model(&Client{})
-
-	if scope.CompanyId != nil {
-		query = query.Where("company_id = ?", *scope.CompanyId)
-	}
+	query := r.db.Model(&Client{}).
+		Joins("JOIN deals ON deals.id = clients.deal_id").
+		Where("deals.company_id = ?", scope.CompanyId)
 
 	if scope.ManagerId != nil {
-		query = query.Where("manager_id = ?", *scope.ManagerId)
+		query = query.Where("deals.manager_id = ?", *scope.ManagerId)
 	}
 
 	if err := query.Count(&total).Error; err != nil {
@@ -53,14 +51,13 @@ func (r *ClientRepository) FindForUpdate(tx *gorm.DB, id string, scope *utils.Au
 
 	query := tx.Clauses(clause.Locking{
 		Strength: "UPDATE",
-	}).Where("id = ?", id)
-
-	if scope.CompanyId != nil {
-		query = query.Where("company_id = ?", scope.CompanyId)
-	}
+	}).Model(&Client{}).
+		Joins("JOIN deals ON deals.id = clients.deal_id").
+		Where("clients.id = ?", id).
+		Where("deals.company_id = ?", scope.CompanyId)
 
 	if scope.ManagerId != nil {
-		query = query.Where("manager_id = ?", scope.ManagerId)
+		query = query.Where("deals.manager_id = ?", *scope.ManagerId)
 	}
 
 	err := query.First(&client).Error
@@ -75,51 +72,36 @@ func (r *ClientRepository) FindForUpdate(tx *gorm.DB, id string, scope *utils.Au
 	return &client, nil
 }
 
-func (r *ClientRepository) FindById(id string, scope *utils.AuthScope) (*Client, error) {
-	var client Client
-
-	query := r.db.Where("id = ?", id)
-
-	if scope.CompanyId != nil {
-		query = query.Where("company_id = ?", *scope.CompanyId)
-	}
-
-	if scope.ManagerId != nil {
-		query = query.Where("manager_id = ?", *scope.ManagerId)
-	}
-
-	err := query.First(&client).Error
-
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, utils.ErrRecordNotFound
-		}
-
-		return nil, err
-	}
-
-	return &client, nil
-}
-
-func (r *ClientRepository) Delete(tx *gorm.DB, id uuid.UUID, scope *utils.AuthScope) error {
+func (r *ClientRepository) DeleteWithDeal(tx *gorm.DB, id uuid.UUID) error {
 	query := tx.Where("id = ?", id)
-
-	if scope.CompanyId != nil {
-		query = query.Where("company_id = ?", scope.CompanyId)
-	}
-
-	if scope.ManagerId != nil {
-		query = query.Where("manager_id = ?", scope.ManagerId)
-	}
 
 	result := query.Delete(&Client{})
 
-	if result.RowsAffected == 0 {
-		return utils.ErrRecordNotFound
+	if result.Error != nil {
+		return result.Error
 	}
+
+	return nil
+}
+
+func (r *ClientRepository) Delete(id string, scope *utils.AuthScope) error {
+	query := r.db.Model(&Client{}).
+		Joins("JOIN deals ON deals.id = clients.deal_id").
+		Where("clienst.id = ?", id).
+		Where("deals.company_id = ?", scope.CompanyId)
+
+	if scope.ManagerId != nil {
+		query = query.Where("deals.manager_id = ?", *scope.ManagerId)
+	}
+
+	result := query.Unscoped().Delete(&Client{})
 
 	if result.Error != nil {
 		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return utils.ErrRecordNotFound
 	}
 
 	return nil

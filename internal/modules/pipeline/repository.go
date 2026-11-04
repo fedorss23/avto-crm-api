@@ -9,55 +9,62 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type PipelineRepository struct{}
+type PipelineRepository struct{
+	db *gorm.DB
+}
 
-func NewPipelineRepository() *PipelineRepository {
-	return &PipelineRepository{}
+func NewPipelineRepository(db *gorm.DB) *PipelineRepository {
+	return &PipelineRepository{
+		db: db,
+	}
 }
 
 func (r *PipelineRepository) Create(tx *gorm.DB, pipeline *Pipeline) error {
 	return tx.Create(pipeline).Error
 }
 
-
-func (r *PipelineRepository) FindById(tx *gorm.DB, id uuid.UUID) (*Pipeline, error) {
-	var pipeline Pipeline
-
-	if err := tx.Where("id = ?", id).First(&pipeline).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-
-		return nil, err
-	}
-
-	return &pipeline, nil
-}
-
-func (r *PipelineRepository) FindList(tx *gorm.DB, page, limit int) ([]Pipeline, int64, error) {
+func (r *PipelineRepository) FindList(tx *gorm.DB, page, limit int, scope *utils.AuthScope) ([]Pipeline, int64, error) {
 	var pipelines []Pipeline
 	var total int64
 
 	offset := (page - 1) * limit
 
-	if err := tx.Model(&Pipeline{}).Count(&total).Error; err != nil {
+	query := tx.Model(&Pipeline{}).
+		Joins("JOIN deals ON deals.id = pipelines.deal_id").
+		Where("deals.company_id = ?", scope.CompanyId)
+
+	if scope.ManagerId != nil {
+		query = query.Where("deals.manager_id = ?", *scope.ManagerId)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
-	err := tx.Preload("Stages").Offset(offset).Limit(limit).Order("created_at DESC").Find(&pipelines).Error
+	err := query.Preload("Stages").Offset(offset).Limit(limit).Order("pipelines.created_at DESC").Find(&pipelines).Error
 
 	return pipelines, total, err
 }
 
-func (r *PipelineRepository) Delete(tx *gorm.DB, id uuid.UUID, scope *utils.AuthScope) (error) {
+func (r *PipelineRepository) DeleteWithDeal(tx *gorm.DB, id uuid.UUID) error {
 	query := tx.Where("id = ?", id)
 
-	if scope.CompanyId != nil {
-		query = query.Where("company_id = ?", scope.CompanyId)
+	result := query.Delete(&Pipeline{})
+
+	if result.Error != nil {
+		return result.Error
 	}
 
+	return nil
+}
+
+func (r *PipelineRepository) Delete(id string, scope *utils.AuthScope) error {
+	query := r.db.Model(&Pipeline{}).
+		Joins("JOIN deals ON deals.id = pipelines.deal_id").
+		Where("deals.company_id = ?", scope.CompanyId)
+
 	if scope.ManagerId != nil {
-		query = query.Where("manager_id = ?", scope.ManagerId)
+		query = query.Where("deals.manager_id = ?", *scope.ManagerId)
 	}
 
 	result := query.Delete(&Pipeline{})
@@ -73,18 +80,16 @@ func (r *PipelineRepository) Delete(tx *gorm.DB, id uuid.UUID, scope *utils.Auth
 	return nil
 }
 
-func (r *PipelineRepository) FindForUpdate(tx *gorm.DB, id uuid.UUID, scope *utils.AuthScope, isFull bool) (*Pipeline, error) {
+func (r *PipelineRepository) FindForUpdate(tx *gorm.DB, id string, scope *utils.AuthScope, isFull bool) (*Pipeline, error) {
 	var pipeline Pipeline
-	query := tx.Clauses(&clause.Locking{
-		Strength: "UPDATE",
-	}).Where("id = ?", id)
-
-	if scope.CompanyId != nil {
-		query = query.Where("company_id = ?", *scope.CompanyId)
-	}
+	query := tx.Clauses(&clause.Locking{Strength: "UPDATE"}).
+		Model(&Pipeline{}).
+		Joins("JOIN deals ON deals.id = pipelines.deal_id").
+		Where("pipelines.id = ?", id).
+		Where("deals.company_id = ?", scope.CompanyId)
 
 	if scope.ManagerId != nil {
-		query = query.Where("manager_id = ?", *scope.ManagerId)
+		query = query.Where("deals.manager_id = ?", *scope.ManagerId)
 	}
 
 	if isFull {
@@ -103,4 +108,3 @@ func (r *PipelineRepository) FindForUpdate(tx *gorm.DB, id uuid.UUID, scope *uti
 
 	return &pipeline, nil
 }
-

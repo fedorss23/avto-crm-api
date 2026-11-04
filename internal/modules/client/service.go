@@ -18,10 +18,6 @@ func NewClientService(clientRepo *ClientRepository, db *gorm.DB) *ClientService 
 	}
 }
 
-func (s *ClientService) FindById(id string, scope *utils.AuthScope) (*Client, error) {
-	return s.clientRepo.FindById(id, scope)
-}
-
 func (s *ClientService) FindList(page, limit int, scope *utils.AuthScope) ([]Client, int64, error) {
 	return s.clientRepo.FindList(page, limit, scope)
 }
@@ -29,7 +25,8 @@ func (s *ClientService) FindList(page, limit int, scope *utils.AuthScope) ([]Cli
 func (s *ClientService) Update(req *UpdateClientRequest, id string, scope *utils.AuthScope) (*Client, error) {
 	var client *Client
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		client, err := s.clientRepo.FindForUpdate(tx, id, scope)
+		var err error
+		client, err = s.clientRepo.FindForUpdate(tx, id, scope)
 
 		if err != nil {
 			return err
@@ -45,8 +42,16 @@ func (s *ClientService) Update(req *UpdateClientRequest, id string, scope *utils
 			updateMap["phone"] = *req.Phone
 		}
 
+		if len(updateMap) == 0 {
+			return utils.ErrEmptyBodyForUpdate
+		}
+
 		return tx.Model(client).Updates(updateMap).Error
 	})
 
 	return client, err
+}
+
+func (s *ClientService) Delete(id string, scope *utils.AuthScope) error {
+	return s.clientRepo.Delete(id, scope)
 }

@@ -82,6 +82,4 @@ func (h *CompanyHandler) Delete(c *gin.Context) {
 	if err := utils.GetParam(c, "companyId", &companyId); err != nil {
 		return
 	}
-
-	
 }

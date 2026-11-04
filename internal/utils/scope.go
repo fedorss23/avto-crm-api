@@ -6,7 +6,7 @@ import (
 )
 
 type AuthScope struct {
-	CompanyId *uuid.UUID
+	CompanyId uuid.UUID
 	ManagerId *uuid.UUID
 }
 
@@ -40,7 +40,7 @@ func GetAuthScopeWithManager(c *gin.Context) (*AuthScope, error) {
 			return nil, err
 		}
 
-		scope.CompanyId = &companyId
+		scope.CompanyId = companyId
 	}
 
 	if userType == "manager" {
@@ -95,7 +95,7 @@ func GetAuthScope(c *gin.Context) (*AuthScope, error) {
 			return nil, err
 		}
 
-		scope.CompanyId = &companyId
+		scope.CompanyId = companyId
 	}
 
 	if userType == "manager" {

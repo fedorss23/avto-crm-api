@@ -17,38 +17,26 @@ func NewCarHandler(carService *CarService) *CarHandler {
 	}
 }
 
-func (h *CarHandler) Create(c *gin.Context) {
-	var req *Car
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		errs := utils.ParseValidationErrors(err)
-		utils.ValidationErrorResponse(c, errs)
-		return
-	}
-
-	if err := h.carService.carRepo.Create(req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error(), err, CodeByError(err))
-		return
-	}
-
-	utils.SuccessResponse(c, http.StatusOK, "Машина успешно создана", req)
-}
-
 func (h *CarHandler) FindAll(c *gin.Context) {
 	var page int
-	if err := utils.GetNumberQuery(c, "page", &page, 1, pageErrorCode); err != nil {
+	if err := utils.GetNumberQuery(c, "page", &page, 1, utils.PageErrorCode); err != nil {
 		return
 	}
 
 	var limit int
-	if err := utils.GetNumberQuery(c, "limit", &limit, 10, limitErrorCode); err != nil {
+	if err := utils.GetNumberQuery(c, "limit", &limit, 10, utils.LimitErrorCode); err != nil {
 		return
 	}
 
-	cars, total, err := h.carService.FindList(page, limit)
+	scope, err := utils.GetAuthScopeWithManager(c)
+	if err != nil {
+		return
+	}
+
+	cars, total, err := h.carService.FindList(page, limit, scope)
 
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error(), err, CodeByError(err))
+		utils.CallErrorResponse(c, err)
 		return
 	}
 
@@ -59,18 +47,49 @@ func (h *CarHandler) FindAll(c *gin.Context) {
 }
 
 func (h *CarHandler) Update(c *gin.Context) {
-	var req *Car
-
+	var req UpdateCarRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
 		utils.ValidationErrorResponse(c, errs)
 		return
 	}
 
-	if err := h.carService.Update(req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error(), err, CodeByError(err))
+	var carId string
+	if err := utils.GetParam(c, "carId", &carId); err != nil {
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusOK, "Машина успешно обновлена", req)
+	scope, err := utils.GetAuthScope(c)
+	if err != nil {
+		return
+	}
+
+	car, err := h.carService.Update(&req, carId, scope)
+	if err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "Машина успешно обновлена", UpdateCarResponse{
+		Car: *car,
+	})
+}
+
+func (h *CarHandler) Delete(c *gin.Context) {
+	var carId string
+	if err := utils.GetParam(c, "carId", &carId); err != nil {
+		return
+	}
+
+	scope, err := utils.GetAuthScope(c)
+	if err != nil {
+		return
+	}
+
+	if err := h.carService.Delete(carId, scope); err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	utils.SuccessResponseWithoutBody(c, http.StatusOK, "car successfully deleted")
 }

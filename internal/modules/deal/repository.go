@@ -25,11 +25,7 @@ func (r *DealRepository) Create(tx *gorm.DB, deal *Deal) error {
 func (r *DealRepository) FindById(id string, scope *utils.AuthScope, isFull bool) (*Deal, error) {
 	var deal Deal
 
-	query := r.db.Where("id = ?", id)
-
-	if scope.CompanyId != nil {
-		query = query.Where("company_id = ?", *scope.CompanyId)
-	}
+	query := r.db.Where("id = ? AND company_id = ?", id, scope.CompanyId)
 
 	if scope.ManagerId != nil {
 		query = query.Where("manager_id = ?", *scope.ManagerId)
@@ -56,11 +52,31 @@ func (r *DealRepository) FindForUpdate(tx *gorm.DB, id string, scope *utils.Auth
 
 	query := tx.Clauses(clause.Locking{
 		Strength: "UPDATE",
-	}).Preload("Pipeline.Stages").Where("id = ?", id)
+	}).Preload("Pipeline.Stages").Where("id = ? AND company_id = ?", id, scope.CompanyId)
 
-	if scope.CompanyId != nil {
-		query = query.Where("company_id = ?", *scope.CompanyId)
+	if scope.ManagerId != nil {
+		query = query.Where("manager_id = ?", *scope.ManagerId)
 	}
+
+	err := query.First(&deal).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.ErrRecordNotFound
+		}
+
+		return nil, err
+	}
+
+	return &deal, nil
+}
+
+func (r *DealRepository) FindForDelete(tx *gorm.DB, id string, scope *utils.AuthScope) (*Deal, error) {
+	var deal Deal
+
+	query := tx.Clauses(clause.Locking{
+		Strength: "UPDATE",
+	}).Preload("Pipeline.Stages").Preload("Client").Preload("Car").Where("id = ? AND company_id = ?", id, scope.CompanyId)
 
 	if scope.ManagerId != nil {
 		query = query.Where("manager_id = ?", *scope.ManagerId)
@@ -82,11 +98,7 @@ func (r *DealRepository) FindForUpdate(tx *gorm.DB, id string, scope *utils.Auth
 func (r *DealRepository) GetTotalForStatus(scope *utils.AuthScope, status string) (int64, error) {
 	var total int64
 
-	query := r.db.Model(&Deal{})
-
-	if scope.CompanyId != nil  {
-		query = query.Where("company_id = ?", *scope.CompanyId)
-	}
+	query := r.db.Model(&Deal{}).Where("company_id = ?", scope.CompanyId)
 
 	if scope.ManagerId != nil {
 		query = query.Where("manager_id = ?", *scope.ManagerId)
@@ -109,11 +121,7 @@ func (r *DealRepository) FindList(filters *DealFilters) ([]Deal, int64, error) {
 
 	offset := (filters.page - 1) * filters.limit
 
-	query := r.db.Model(&Deal{})
-
-	if filters.scope.CompanyId != nil {
-		query = query.Where("company_id = ?", *filters.scope.CompanyId)
-	}
+	query := r.db.Model(&Deal{}).Where("company_id = ?", filters.scope.CompanyId)
 
 	if filters.scope.ManagerId != nil{
 		query = query.Where("manager_id = ?", *filters.scope.ManagerId)
@@ -144,23 +152,23 @@ func (r *DealRepository) FindList(filters *DealFilters) ([]Deal, int64, error) {
 	return deals, total, err
 }
 
-func (r *DealRepository) Delete(tx *gorm.DB, dealId string, scope *utils.AuthScope) error {
+func (r *DealRepository) Delete(tx *gorm.DB, dealId string, scope *utils.AuthScope, fullDelete bool) error {
 	query := r.db.Where(
-		"id = ?",
+		"id = ? AND company_id = ?",
 		dealId,
+		scope.CompanyId,
 	)
-
-	if scope.CompanyId != nil {
-		query = query.Where("company_id = ?", *scope.CompanyId)
-	}
 
 	if scope.ManagerId != nil {
 		query = query.Where("manager_id = ?", *scope.ManagerId)
 	}
 
-	// TODO: вызвать delete у всех связанных сущностей
-
-	result := query.Delete(&Deal{})
+	var result *gorm.DB
+	if fullDelete == true {
+		result = query.Unscoped().Delete(&Deal{})
+	} else {
+		result = query.Delete(&Deal{})
+	}
 
 	if result.Error != nil {
 		return result.Error
