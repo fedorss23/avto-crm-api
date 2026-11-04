@@ -1,5 +1,7 @@
 package pipeline
 
+import "avto-crm-api/internal/modules/stage"
+
 type PipelinesResponse struct {
 	Pipelines []Pipeline `json:"pipelines"`
 	Total int64 `json:"total"`
@@ -22,4 +24,13 @@ type AddStage struct {
 
 type UpdatePipelineResponse struct {
 	Pipeline Pipeline `json:"pipeline"`
+}
+
+type UpdateStageRequest struct {
+	Name *string `json:"nane"`
+	Description *string `json:"description"`
+}
+
+type UpdateStageResponse struct {
+	Stage stage.Stage `json:"stage"`
 }

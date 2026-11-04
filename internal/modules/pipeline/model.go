@@ -12,12 +12,14 @@ type Pipeline struct {
 	ID   uuid.UUID `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	Name string    `gorm:"" json:"name"`
 
-	Source string `gorm:"not null" json:"source"`
+	Source      string `gorm:"not null" json:"source"`
 	Destination string `gorm:"not null" json:"destination"`
 
-	Stages []stage.Stage `gorm:"foreignKey:PipelineID" json:"stages"`
+	DealID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"dealId"`
 
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-    DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Stages []stage.Stage `gorm:"foreignKey:PipelineID;references:ID;constraint:OnDelete:CASCADE" json:"stages"`
+
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }

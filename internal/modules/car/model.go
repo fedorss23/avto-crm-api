@@ -1,8 +1,10 @@
 package car
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type Car struct {
@@ -10,6 +12,9 @@ type Car struct {
 
 	Model string `gorm:"not null" json:"model"`
 
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	DealID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"dealId"`
+
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }

@@ -176,7 +176,12 @@ func (h *DealHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.dealService.Delete(dealId, scope); err != nil {
+	var fullDelete bool
+	if err := utils.GetBoolQuery(c, "fullDelete", &fullDelete, false, "INVALID_FULL_DELETE"); err != nil {
+		return
+	}
+
+	if err := h.dealService.Delete(dealId, scope, fullDelete); err != nil {
 		utils.ErrorResponse(c, utils.ErrorToHTTPStatus(err), "Error with delete deal", err, utils.CodeByError(err))
 		return
 	}

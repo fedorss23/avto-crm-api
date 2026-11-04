@@ -291,6 +291,7 @@ func StandartMiddlewareWithCompany(secret string, findCompany func(ownerId, comp
 					Code: utils.ValidationErrorCode,
 				},
 			})
+			return
 		}
 
 		cid, err := uuid.Parse(companyId)
@@ -303,6 +304,7 @@ func StandartMiddlewareWithCompany(secret string, findCompany func(ownerId, comp
 					Code: utils.ValidationErrorCode,
 				},
 			})
+			return
 		}
 
 		if _, err := findCompany(oid, cid); err != nil {

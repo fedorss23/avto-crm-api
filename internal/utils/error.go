@@ -32,8 +32,10 @@ var (
 	ErrPasswordIncorrectLogin    = errors.New("invalid password")
 	ErrPasswordIncorrectRegister = errors.New("invalid password")
 
-	ErrNotManagers = errors.New("ou should have at least one manager")
+	ErrNotManagers = errors.New("you should have at least one manager")
 	ErrNameAlreadyExists = errors.New("name already exists")
+
+	ErrEmptyBodyForUpdate = errors.New("you should add at least one field ")
 )
 
 const (
@@ -57,11 +59,13 @@ const (
 	LastStageCode               = "DEAL_ALREADY_AT_LAST_STAGE"
 
 	InternalErrorCode = "INTERNAL_ERROR"
+
+	EmptyBodyCode = "EMPTY_BODY"
 )
 
 func CodeByError(err error) string {
 	switch {
-	case errors.Is(err, ErrRecordNotFound):
+	case errors.Is(err, ErrRecordNotFound), errors.Is(err, ErrUserNotFound):
 		return RecordNotFoundCode
 
 	case errors.Is(err, ErrForbidden):
@@ -70,17 +74,11 @@ func CodeByError(err error) string {
 	case errors.Is(err, ErrEmailAlredyExists), errors.Is(err, ErrConflict), errors.Is(err, ErrLoginAlreadyExists), errors.Is(err, ErrNotManagers), errors.Is(err, ErrNameAlreadyExists):
 		return ConflictCode
 
-	case errors.Is(err, ErrUnauthorized):
-		return UnauthorizedCode
-
-	case errors.Is(err, ErrUserNotFound):
-		return RecordNotFoundCode
-
-	case errors.Is(err, ErrInvalidCredentials), errors.Is(err, ErrInvalidRefreshToken):
+	case errors.Is(err, ErrUnauthorized), errors.Is(err, ErrInvalidCredentials), errors.Is(err, ErrInvalidRefreshToken):
 		return UnauthorizedCode
 
 	case errors.Is(err, ErrNotPipeline):
-		return DealPipelineNotFoundCode
+		return RecordNotFoundCode
 
 	case errors.Is(err, ErrEmptyPipeline):
 		return DealPipelineEmptyCode
@@ -126,7 +124,8 @@ func ErrorToHTTPStatus(err error) int {
 
 	case errors.Is(err, ErrInvalidStageId),
 		errors.Is(err, ErrPasswordIncorrectRegister),
-		errors.Is(err, ErrPasswordIncorrectLogin):
+		errors.Is(err, ErrPasswordIncorrectLogin),
+		errors.Is(err, ErrEmptyBodyForUpdate):
 		return http.StatusBadRequest
 
 	case errors.Is(err, ErrNotPipeline),

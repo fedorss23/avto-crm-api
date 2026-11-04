@@ -29,12 +29,8 @@ func (p *PipelineService) Create(req *Pipeline) error {
 func (p *PipelineService) Update(pipelineId string, req *UpdatePipelineRequest, scope *utils.AuthScope) (*Pipeline, error) {
 	var pipeline *Pipeline
 	err := p.db.Transaction(func(tx *gorm.DB) error {
-		pid, err := uuid.Parse(pipelineId)
-		if err != nil {
-			return err
-		}
-
-		pipeline, err = p.pipeRepo.FindForUpdate(tx, pid, scope, false)
+		var err error
+		pipeline, err = p.pipeRepo.FindForUpdate(tx, pipelineId, scope, false)
 		if err != nil {
 			return err
 		}
@@ -53,6 +49,10 @@ func (p *PipelineService) Update(pipelineId string, req *UpdatePipelineRequest, 
 			updateMap["destination"] = *req.Destination
 		}
 
+		if len(updateMap) == 0 {
+			return utils.ErrEmptyBodyForUpdate
+		}
+
 		return tx.Model(pipeline).Updates(updateMap).Error
 	})
 	return pipeline, err
@@ -61,12 +61,8 @@ func (p *PipelineService) Update(pipelineId string, req *UpdatePipelineRequest, 
 func (p *PipelineService) AddStages(pipelineId string, req *AddPipelineStages, scope *utils.AuthScope) (*Pipeline, error) {
 	var pipeline *Pipeline
 	err := p.db.Transaction(func(tx *gorm.DB) error {
-		pid, err := uuid.Parse(pipelineId)
-		if err != nil {
-			return err
-		}
-
-		pipeline, err = p.pipeRepo.FindForUpdate(tx, pid, scope, true)
+		var err error
+		pipeline, err = p.pipeRepo.FindForUpdate(tx, pipelineId, scope, true)
 		if err != nil {
 			return err
 		}
@@ -93,20 +89,16 @@ func (p *PipelineService) AddStages(pipelineId string, req *AddPipelineStages, s
 	return pipeline, err
 }
 
+// вынести в stage и переписать
 func (p *PipelineService) DeleteStage(pipelineId, stageId string, scope *utils.AuthScope) (*Pipeline, error) {
 	var pipeline *Pipeline
 	err := p.db.Transaction(func(tx *gorm.DB) error {
-		pid, err := uuid.Parse(pipelineId)
-		if err != nil {
-			return err
-		}
-
 		sti, err := uuid.Parse(stageId)
 		if err != nil {
 			return err
 		}
 
-		pipeline, err = p.pipeRepo.FindForUpdate(tx, pid, scope, true)
+		pipeline, err = p.pipeRepo.FindForUpdate(tx, pipelineId, scope, true)
 		if err != nil {
 			return err
 		}
@@ -138,11 +130,55 @@ func (p *PipelineService) DeleteStage(pipelineId, stageId string, scope *utils.A
 			return ferr
 		}
 
-		return p.stageRepo.Delete(tx, sti, scope)
+		return p.stageRepo.Delete(tx, sti)
 	})
 	return pipeline, err
 }
 
-func (p *PipelineService) FindAll(page, limit int) ([]Pipeline, int64, error) {
-	return p.pipeRepo.FindList(p.db, page, limit)
+func (p *PipelineService) FindAll(page, limit int, scope *utils.AuthScope) ([]Pipeline, int64, error) {
+	return p.pipeRepo.FindList(p.db, page, limit, scope)
+}
+
+func (p *PipelineService) Delete(id string, scope *utils.AuthScope) error {
+	return p.pipeRepo.Delete(id, scope)
+}
+
+func (p *PipelineService) UpdateStage(req *UpdateStageRequest, pipelineId, stageId string, scope *utils.AuthScope) (*stage.Stage, error) {
+	var newstage *stage.Stage
+	err := p.db.Transaction(func(tx *gorm.DB) error {
+		pipeline, err := p.pipeRepo.FindForUpdate(tx, pipelineId, scope, true)
+		if err != nil {
+			return err
+		}
+
+		found := false
+
+		for _, i := range pipeline.Stages {
+			if i.ID.String() == stageId {
+				found = true
+			}
+		}
+
+		if !found {
+			return utils.ErrRecordNotFound
+		}
+
+		updateMap := make(map[string]interface{})
+
+		if req.Name != nil {
+			updateMap["name"] = *req.Name
+		}
+
+		if req.Description != nil {
+			updateMap["description"] = *req.Description
+ 		}
+
+		if len(updateMap) == 0 {
+			return utils.ErrEmptyBodyForUpdate
+		}
+
+		return tx.Model(&stage.Stage{}).Where("id = ?", stageId).Updates(updateMap).First(newstage).Error
+	})
+
+	return newstage, err
 }

@@ -56,12 +56,12 @@ func AutoMigrate(db *gorm.DB) error {
 	log.Println("Запуск миграций")
 
 	err := db.AutoMigrate(
+		&deal.Deal{},
 		&user.User{},
 		&pipeline.Pipeline{},
 		&car.Car{},
 		&stage.Stage{},
 		&client.Client{},
-		&deal.Deal{},
 		&manager.Manager{},
 		&company.Company{},
 	)
