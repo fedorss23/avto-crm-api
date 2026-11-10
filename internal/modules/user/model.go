@@ -18,7 +18,7 @@ type User struct {
 	MiddleName *string `json:"middleName"`
 	LastName string `gorm:"not null" json:"lastName"`
 
-	Company []company.Company `gorm:"foreignKey:OwnerID" json:"companyId"`
+	Companies []company.Company `gorm:"foreignKey:OwnerID;references:ID;constaint:onDelete:CASCADE" json:"companies"`
 
 	IsLocked bool `gorm:"default:false" json:"isLocked"`
 

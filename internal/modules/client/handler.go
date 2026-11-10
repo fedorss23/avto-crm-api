@@ -55,7 +55,7 @@ func (h *ClientHandler) FindList(c *gin.Context) {
 
 func (h *ClientHandler) Update(c *gin.Context) {
 	var req UpdateClientRequest
-	if err := c.ShouldBindJSON(req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		errs := utils.ParseValidationErrors(err)
 		utils.ValidationErrorResponse(c, errs)
 		return

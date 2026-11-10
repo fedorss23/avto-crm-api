@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"avto-crm-api/internal/modules/deal"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,13 +15,16 @@ type Manager struct {
 	Password string `gorm:"" json:"-"`
 
 	Name       string  `gorm:"not null" json:"name"`
-	MiddleName string  `gorm:"not null" json:"middleName"`
-	LastName   *string `json:"lastName"`
+	MiddleName *string  `json:"middleName"`
+	LastName   string `gorm:"not null" json:"lastName"`
 
 	Phone *string `json:"phone"`
 	Role  string  `gorm:"default:standart" json:"role"`
 
 	CompanyID uuid.UUID `gorm:"not null" json:"companyId"`
+	OwnerID uuid.UUID `gorm:"not null" json:"dealId"`
+
+	Deals []deal.Deal `gorm:"foreignKey:ManagerID;references:ID;constraint:OnDelete:CASCADE" json:"deals"`
 
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"updatedAt"`

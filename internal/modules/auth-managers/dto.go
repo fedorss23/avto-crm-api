@@ -7,8 +7,8 @@ type RegisterRequest struct {
 	Login string `json:"login" binding:"required"`
 	Password string `json:"password" binding:"required,min=8,max=72"`
 	Name string `json:"name" binding:"required"`
-	MiddleName string `json:"middleName" binding:"required"`
-	LastName *string `json:"lastName,omitempty"`
+	MiddleName *string `json:"middleName"`
+	LastName string `json:"lastName,omitempty" binding:"required"`
 	Phone *string `json:"phone,omitempty"`
 }
 
@@ -50,8 +50,8 @@ type ManagerResponse struct {
 	ID uuid.UUID `json:"id"`
 	Login string `json:"login"`
 	Name string `json:"name"`
-	MiddleName string `json:"middleName"`
-	LastName *string `json:"lastName"`
+	MiddleName *string `json:"middleName"`
+	LastName string `json:"lastName"`
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -68,4 +68,3 @@ type RegisterResponse struct {
 	Manager ManagerResponse `json:"manager"`
 }
 
-//eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJtYW5hZ2VyX2lkIjoiYTkwNGRhMWItOGEwOC00MmU1LWJlYTAtOGFjNmZmZjkxODZkIiwicm9sZSI6InN0YW5kYXJ0IiwiY29tcGFueV9pZCI6IjBlNzE5Mjk5LWVlMTYtNGMzOC1hOTUxLWJlMzkxM2RmZDViNCIsImlzcyI6ImxvY2FsaG9zdCIsInN1YiI6ImE5MDRkYTFiLThhMDgtNDJlNS1iZWEwLThhYzZmZmY5MTg2ZCIsImV4cCI6MTc5MzIxNjE0NiwibmJmIjoxNzkzMTI5NzQ2LCJpYXQiOjE3OTMxMjk3NDZ9.lnpiS-Dp1c34n0Jm-yXKPFV3qSGgtdSje9wK4d45hnA

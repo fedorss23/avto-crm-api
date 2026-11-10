@@ -16,7 +16,7 @@ type Company struct {
 
 	OwnerID uuid.UUID `gorm:"not null" json:"ownerId"`
 	
-	Managers []manager.Manager `gorm:"foreignKey:CompanyID" json:"managers"`
+	Managers []manager.Manager `gorm:"foreignKey:CompanyID;references:ID;constraint:OnDelete:CASCADE" json:"managers"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`

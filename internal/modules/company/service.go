@@ -57,6 +57,9 @@ func (s *CompanyService) Update(req *UpdateCompanyRequest, ownerId string, compa
 		}
 
 		company, err := s.companyRepo.FindByIdForUpdate(tx, oid, cid)
+		if err != nil {
+			return err
+		}
 
 		updateMap := make(map[string]interface{})
 
@@ -75,7 +78,7 @@ func (s *CompanyService) Update(req *UpdateCompanyRequest, ownerId string, compa
 		}
 
 		if req.TypeCompany != nil {
-			updateMap["typeCompany"] = *req.TypeCompany
+			updateMap["type_company"] = *req.TypeCompany
 		} 
 
 		ncompany = company
@@ -84,4 +87,8 @@ func (s *CompanyService) Update(req *UpdateCompanyRequest, ownerId string, compa
 	})
 
 	return ncompany, err
+}
+
+func (s *CompanyService) Delete(id string, ownerId string) error {
+	return s.companyRepo.Delete(ownerId, id)
 }

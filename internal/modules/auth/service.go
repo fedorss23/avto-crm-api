@@ -63,8 +63,11 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 		Email: req.Email,
 		Password: string(hash),
 		Name: req.Name,
-		MiddleName: req.MiddleName,
 		LastName: req.LastName,
+	}
+
+	if req.MiddleName != nil {
+		user.MiddleName = req.MiddleName
 	}
 
 	if err := s.userRepo.Create(user); err != nil {

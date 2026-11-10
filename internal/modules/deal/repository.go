@@ -4,6 +4,7 @@ import (
 	"avto-crm-api/internal/utils"
 	"errors"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -153,7 +154,7 @@ func (r *DealRepository) FindList(filters *DealFilters) ([]Deal, int64, error) {
 }
 
 func (r *DealRepository) Delete(tx *gorm.DB, dealId string, scope *utils.AuthScope, fullDelete bool) error {
-	query := r.db.Where(
+	query := tx.Where(
 		"id = ? AND company_id = ?",
 		dealId,
 		scope.CompanyId,
@@ -178,5 +179,39 @@ func (r *DealRepository) Delete(tx *gorm.DB, dealId string, scope *utils.AuthSco
 		return utils.ErrRecordNotFound
 	}
 
+	return nil
+}
+
+func (r *DealRepository) GetFreeManager(tx *gorm.DB, companyId uuid.UUID) (string, error) {
+	if err := r.CheckManagers(tx, companyId); err != nil {
+		return "", err
+	}
+
+	mid := struct{
+		ID uuid.UUID
+	}{}
+	err := tx.Table("managers").
+		Joins("LEFT JOIN deals ON deals.manager_id = managers.id").
+		Where("managers.company_id = ?", companyId).
+		Group("managers.id").
+		Order("COUNT(deals.id) ASC",).
+		First(&mid).Error
+
+	if err != nil {
+		return "", err
+	}
+
+
+	return mid.ID.String(), nil
+}
+
+func (r *DealRepository) CheckManagers(tx *gorm.DB, companyId uuid.UUID) error {
+	var count int64
+	if err := tx.Table("managers").Where("company_id = ?::uuid", companyId).Count(&count).Error; err != nil || count == 0 {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.ErrNotManagers
+		}
+		return err
+	}
 	return nil
 }

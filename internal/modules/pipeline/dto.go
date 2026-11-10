@@ -27,7 +27,7 @@ type UpdatePipelineResponse struct {
 }
 
 type UpdateStageRequest struct {
-	Name *string `json:"nane"`
+	Name *string `json:"name"`
 	Description *string `json:"description"`
 }
 
