@@ -128,16 +128,14 @@ func (h *PipelineHandler) UpdateStage(c *gin.Context) {
 		return
 	}
 
-	stage, err := h.pipeService.UpdateStage(&req, pipelineId, stageId, scope)
+	_, err = h.pipeService.UpdateStage(&req, pipelineId, stageId, scope)
 
 	if err != nil {
 		utils.CallErrorResponse(c, err)
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusOK, "stage successfully updated", UpdateStageResponse{
-		Stage: *stage,
-	})
+	utils.SuccessResponseWithoutBody(c, http.StatusOK, "stage successfully updated")
 }
 
 func (h *PipelineHandler) DeleteStage(c *gin.Context) {

@@ -36,6 +36,19 @@ func (r *CompanyRepository) FindById(ownerId uuid.UUID, companyId uuid.UUID) (*C
 	return &company, nil
 }
 
+func (r *CompanyRepository) FindFullById(ownerId, companyId string) (*Company, error) {
+	var company Company
+	if err := r.db.Preload("Managers").Where("owner_id = ? AND id = ?", ownerId, companyId).First(&company).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.ErrRecordNotFound
+		}
+
+		return nil, err
+	}
+
+	return &company, nil
+}
+
 func (r *CompanyRepository) FindByIdForUpdate(tx *gorm.DB, ownerId uuid.UUID, companyId uuid.UUID) (*Company, error) {
 	var company Company
 
@@ -92,4 +105,18 @@ func (r *CompanyRepository) FindList(ownerId uuid.UUID) ([]Company, error) {
 	}
 
 	return companies, nil
+}
+
+func (r *CompanyRepository) Delete(ownerId, companyId string) error {
+	result := r.db.Where("id = ? AND owner_id = ?", companyId, ownerId).Unscoped().Delete(&Company{})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return utils.ErrRecordNotFound
+	}
+
+	return nil
 }

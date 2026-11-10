@@ -79,7 +79,7 @@ func main() {
 
 	authManagerService := authmanagers.NewAuthService(managerRepo, companyRepo, jwtMaker, &authMConfig, db)
 	authService := auth.NewAuthService(userRepo, jwtMaker, serviceConfig, db)
-	dealService := deal.NewDealService(db, dealRepo, carRepo, pipelineRepo, stageRepo, clientRepo, managerRepo)
+	dealService := deal.NewDealService(db, dealRepo, carRepo, pipelineRepo, stageRepo, clientRepo)
 	carService := car.NewCarService(carRepo, db)
 	clientSerivce := client.NewClientService(clientRepo, db)
 	pipelineService := pipeline.NewPipelineService(pipelineRepo, stageRepo, db)
@@ -131,19 +131,19 @@ func main() {
 			authMA.Use(middleware.ManagerAuthMiddleware(cfg.JWTSecret))
 			{
 				authMA.POST("/refresh-tokens", authManagerHandler.RefreshTokens)
-				authMA.POST("/", authManagerHandler.ChangePassword)
 			}
 
 			authMr := authM.Group("")
 			authMr.Use(middleware.UserAuthMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
 			{
 				authMr.POST("/register", authManagerHandler.Register)
+				authMA.POST("/", authManagerHandler.ChangePassword)
 			}
 
 		}
 
 		deal := api.Group("/deal")
-		deal.Use(middleware.StandartMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
+		deal.Use(middleware.StandartMiddlewareWithCompanyCheckManager(cfg.JWTSecret, companyRepo.FindById, managerRepo.FindByIdWithOwner))
 		{
 			deal.GET("", dealHandler.FindList)
 			deal.GET("/total", dealHandler.GetTotalByStatus)
@@ -154,36 +154,38 @@ func main() {
 		}
 
 		car := api.Group("/car")
-		car.Use(middleware.StandartMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
+		car.Use(middleware.StandartMiddlewareWithCompanyCheckManager(cfg.JWTSecret, companyRepo.FindById, managerRepo.FindByIdWithOwner))
 		{
 			car.GET("", carHandler.FindAll)
-			car.PUT("", carHandler.Update)
-			car.DELETE("", carHandler.Delete)
+			car.PUT("/:carId", carHandler.Update)
+			car.DELETE("/:carId", carHandler.Delete)
 		}
 
 		client := api.Group("/client")
-		client.Use(middleware.StandartMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
+		client.Use(middleware.StandartMiddlewareWithCompanyCheckManager(cfg.JWTSecret, companyRepo.FindById, managerRepo.FindByIdWithOwner))
 		{
 			client.GET("", clientHandler.FindList)
 			client.PUT("/:clientId", clientHandler.Update)
-			client.DELETE("", clientHandler.Delete)
+			client.DELETE("/:clientId", clientHandler.Delete)
 		}
 
 		pipeline := api.Group("/pipeline")
-		pipeline.Use(middleware.StandartMiddlewareWithCompany(cfg.JWTSecret, companyRepo.FindById))
+		pipeline.Use(middleware.StandartMiddlewareWithCompanyCheckManager(cfg.JWTSecret, companyRepo.FindById, managerRepo.FindByIdWithOwner))
 		{
 			pipeline.GET("", pipelineHandler.FindList)
 			pipeline.PUT("/:pipelineId", pipelineHandler.Update)
 			pipeline.POST("/:pipelineId/stage", pipelineHandler.AddStages)
 			pipeline.DELETE("/:pipelineId/stage", pipelineHandler.DeleteStage)
-			pipeline.DELETE("", pipelineHandler.Delete)
-			pipeline.PUT("/:pipeline/stage", pipelineHandler.UpdateStage)
+			pipeline.DELETE("/:pipelineId", pipelineHandler.Delete)
+			pipeline.PUT("/:pipelineId/stage", pipelineHandler.UpdateStage)
 		}
 
 		company := api.Group("/company")
 		company.Use(middleware.UserAuthMiddleware(cfg.JWTSecret))
 		{
 			company.POST("", companyHandler.Create)
+			company.PUT("/:companyId", companyHandler.Update)
+			company.DELETE("/:companyId", companyHandler.Delete)
 		}
 	}
 

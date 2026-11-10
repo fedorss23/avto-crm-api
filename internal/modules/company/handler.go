@@ -82,4 +82,11 @@ func (h *CompanyHandler) Delete(c *gin.Context) {
 	if err := utils.GetParam(c, "companyId", &companyId); err != nil {
 		return
 	}
+
+	if err := h.companyService.Delete(companyId, ownerId); err != nil {
+		utils.CallErrorResponse(c, err)
+		return
+	}
+
+	utils.SuccessResponseWithoutBody(c, http.StatusOK, "company successfully deleted")
 }

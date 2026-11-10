@@ -48,16 +48,10 @@ func (r *CarRepository) FindList(page, limit int, scope *utils.AuthScope) ([]Car
 
 func (r *CarRepository) FindForUpdate(tx *gorm.DB, id string, scope *utils.AuthScope) (*Car, error) {
 	var car Car
-	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Joins("JOIN deals ON deals.id = cars.deal_id").
-		Where("cars.id = ?", id).
-		Where("deals.company_id = ?", scope.CompanyId)
-
-	if scope.ManagerId != nil {
-		query = query.Where("deals.manager_id = ?", *scope.ManagerId)
-	}
-
-	err := query.First(&car).Error
+	err := tx.Model(&Car{}).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).
+		Where("EXISTS (?)", r.checkAccessQuery(tx, scope)).
+		First(&car).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -83,16 +77,11 @@ func (r *CarRepository) DeleteWithDeal(tx *gorm.DB, id uuid.UUID) error {
 }
 
 func (r *CarRepository) Delete(id string, scope *utils.AuthScope) error {
-	query := r.db.Model(&Car{}).
-		Joins("JOIN deals ON deals.id = cars.deal_id").
-		Where("cars.id = ?", id).
-		Where("deals.company_id = ?", scope.CompanyId)
-
-	if scope.ManagerId != nil {
-		query = query.Where("deals.manager_id = ?", *scope.ManagerId)
-	}
-
-	result := query.Unscoped().Delete(&Car{})
+	result := r.db.
+		Where("id = ?", id).
+		Where("EXISTS (?)", r.checkAccessQuery(r.db, scope)).
+		Unscoped().
+		Delete(&Car{})
 
 	if result.Error != nil {
 		return result.Error
@@ -103,4 +92,16 @@ func (r *CarRepository) Delete(id string, scope *utils.AuthScope) error {
 	}
 
 	return nil
+}
+
+func (r *CarRepository) checkAccessQuery(tx *gorm.DB, scope *utils.AuthScope) *gorm.DB {
+	subQuery := tx.Table("deals").
+		Select("1").
+		Where("deals.id = cars.deal_id").
+		Where("deals.company_id = ?", scope.CompanyId)
+
+	if scope.ManagerId != nil {
+		subQuery = subQuery.Where("deals.manager_id = ?", *scope.ManagerId)
+	}
+	return subQuery
 }

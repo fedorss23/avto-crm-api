@@ -46,9 +46,9 @@ func GetAuthScopeWithManager(c *gin.Context) (*AuthScope, error) {
 	if userType == "manager" {
 		scope.ManagerId = &userId
 	} else {
-		manager, ok := c.GetQuery("managerId")
+		manager:= c.GetString("managerId")
 
-		if ok && manager != "" {
+		if manager != "" {
 			managerId, err := uuid.Parse(manager)
 
 			if err != nil {

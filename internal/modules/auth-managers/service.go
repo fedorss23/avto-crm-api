@@ -68,20 +68,27 @@ func (s *AuthManagersService) Register(req *RegisterRequest, ownerId string, com
 			return err
 		}
 
+		ownerIdParse, err := uuid.Parse(ownerId)
+
+		if err != nil {
+			return err
+		}
+
 		newManager := &manager.Manager{
 			Login:      req.Login,
 			Password:   hash,
 			Name:       req.Name,
-			MiddleName: req.MiddleName,
+			LastName: req.LastName,
 			CompanyID:  companyIdParse,
+			OwnerID: ownerIdParse,
 		}
 
 		if req.Phone != nil {
 			newManager.Phone = req.Phone
 		}
 
-		if req.LastName != nil {
-			newManager.LastName = req.LastName
+		if req.MiddleName != nil {
+			newManager.MiddleName = req.MiddleName
 		}
 
 		if err := tx.Create(newManager).Error; err != nil {
@@ -119,7 +126,7 @@ func (s *AuthManagersService) generateTokens(managerId, role, companyId string) 
 		return nil, err
 	}
 
-	refreshToken, err := s.jwtMaker.CreateRefreshToken(managerId)
+	refreshToken, err := s.jwtMaker.CreateAccessTokenManager(managerId, role, companyId)
 	if err != nil {
 		return nil, err
 	}

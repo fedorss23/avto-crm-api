@@ -105,10 +105,10 @@ func (p *PipelineService) DeleteStage(pipelineId, stageId string, scope *utils.A
 
 		in := -1
 
-		for index, i := range pipeline.Stages {
+		for index := range pipeline.Stages {
 			if in != -1 {
-				i.Number--
-			} else if i.ID.String() == stageId {
+				pipeline.Stages[index].Number--
+			} else if pipeline.Stages[index].ID.String() == stageId {
 				in = index
 			}
 		}
@@ -119,10 +119,24 @@ func (p *PipelineService) DeleteStage(pipelineId, stageId string, scope *utils.A
 
 		if in == len(pipeline.Stages)-1 {
 			pipeline.Stages = pipeline.Stages[:in]
-		} else if in == 0 {
-			pipeline.Stages = pipeline.Stages[in:]
 		} else {
 			pipeline.Stages = append(pipeline.Stages[:in], pipeline.Stages[in+1:]...)
+		}
+
+		var errd error
+		if in == 0 {
+			errd = tx.Table("deals").Where("id = ?", pipeline.DealID).Updates(map[string]interface{}{
+				"current_stage_id":   pipeline.Stages[in].ID,
+				"current_stage_name": pipeline.Stages[in].Name,
+			}).Error
+		} else {
+			errd = tx.Table("deals").Where("id = ?", pipeline.DealID).Updates(map[string]interface{}{
+				"current_stage_id":   pipeline.Stages[in-1].ID,
+				"current_stage_name": pipeline.Stages[in-1].Name,
+			}).Error
+		}
+		if errd != nil {
+			return errd
 		}
 
 		ferr := tx.Save(pipeline).Error
@@ -171,13 +185,13 @@ func (p *PipelineService) UpdateStage(req *UpdateStageRequest, pipelineId, stage
 
 		if req.Description != nil {
 			updateMap["description"] = *req.Description
- 		}
+		}
 
 		if len(updateMap) == 0 {
 			return utils.ErrEmptyBodyForUpdate
 		}
 
-		return tx.Model(&stage.Stage{}).Where("id = ?", stageId).Updates(updateMap).First(newstage).Error
+		return tx.Model(&stage.Stage{}).Where("id = ?", stageId).Updates(updateMap).Error
 	})
 
 	return newstage, err

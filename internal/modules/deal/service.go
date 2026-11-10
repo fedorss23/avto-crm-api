@@ -3,7 +3,6 @@ package deal
 import (
 	"avto-crm-api/internal/modules/car"
 	"avto-crm-api/internal/modules/client"
-	"avto-crm-api/internal/modules/manager"
 	"avto-crm-api/internal/modules/pipeline"
 	"avto-crm-api/internal/modules/stage"
 	"avto-crm-api/internal/utils"
@@ -21,7 +20,6 @@ type DealService struct {
 	stageRepo   *stage.StageRepository
 	carRepo     *car.CarRepository
 	clientRepo  *client.ClientRepository
-	managerRepo *manager.ManagerRepository
 }
 
 func NewDealService(
@@ -31,7 +29,6 @@ func NewDealService(
 	pipeRepo *pipeline.PipelineRepository,
 	stageRepo *stage.StageRepository,
 	clientRepo *client.ClientRepository,
-	managerRepo *manager.ManagerRepository,
 ) *DealService {
 	return &DealService{
 		db:          db,
@@ -40,7 +37,6 @@ func NewDealService(
 		pipeRepo:    pipeRepo,
 		stageRepo:   stageRepo,
 		clientRepo:  clientRepo,
-		managerRepo: managerRepo,
 	}
 }
 
@@ -52,7 +48,7 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, scope *utils.AuthSc
 	var deal *Deal
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if scope.ManagerId == nil {
-			id, err := s.managerRepo.GetFreeManager(tx, scope.CompanyId)
+			id, err := s.dealRepo.GetFreeManager(tx, scope.CompanyId)
 			if err != nil {
 				if errors.Is(err, utils.ErrRecordNotFound) {
 					return utils.ErrNotManagers
@@ -109,8 +105,8 @@ func (s *DealService) CreateFullDeal(req *CreateDealRequest, scope *utils.AuthSc
 		}
 
 		newClient := &client.Client{
-			Name:      req.Client.Name,
-			DealID:    deal.ID,
+			Name:   req.Client.Name,
+			DealID: deal.ID,
 		}
 
 		if req.Client.Email != nil {
@@ -229,22 +225,28 @@ func (s *DealService) Delete(dealId string, scope *utils.AuthScope, fullDelete b
 			return err
 		}
 
-		for _, i := range deal.Pipeline.Stages {
-			if err := s.stageRepo.DeleteWithPipeline(tx, i.ID); err != nil {
+		if deal.Pipeline != nil {
+			for _, i := range deal.Pipeline.Stages {
+				if err := s.stageRepo.DeleteWithPipeline(tx, i.ID); err != nil {
+					return err
+				}
+			}
+
+			if err := s.pipeRepo.DeleteWithDeal(tx, deal.Pipeline.ID); err != nil {
 				return err
 			}
 		}
 
-		if err := s.pipeRepo.DeleteWithDeal(tx, deal.Pipeline.ID); err != nil {
-			return err
+		if deal.Client != nil {
+			if err := s.clientRepo.DeleteWithDeal(tx, deal.Client.ID); err != nil {
+				return err
+			}
 		}
 
-		if err := s.clientRepo.DeleteWithDeal(tx, deal.Client.ID); err != nil {
-			return err
-		}
-
-		if err := s.carRepo.DeleteWithDeal(tx, deal.Car.ID); err != nil {
-			return err
+		if deal.Car != nil {
+			if err := s.carRepo.DeleteWithDeal(tx, deal.Car.ID); err != nil {
+				return err
+			}
 		}
 
 		return tx.Delete(&deal).Error
@@ -254,4 +256,3 @@ func (s *DealService) Delete(dealId string, scope *utils.AuthScope, fullDelete b
 func (s *DealService) FindById(dealId string, scope *utils.AuthScope, isFull bool) (*Deal, error) {
 	return s.dealRepo.FindById(dealId, scope, isFull)
 }
-

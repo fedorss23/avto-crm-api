@@ -59,15 +59,11 @@ func (r *PipelineRepository) DeleteWithDeal(tx *gorm.DB, id uuid.UUID) error {
 }
 
 func (r *PipelineRepository) Delete(id string, scope *utils.AuthScope) error {
-	query := r.db.Model(&Pipeline{}).
-		Joins("JOIN deals ON deals.id = pipelines.deal_id").
-		Where("deals.company_id = ?", scope.CompanyId)
-
-	if scope.ManagerId != nil {
-		query = query.Where("deals.manager_id = ?", *scope.ManagerId)
-	}
-
-	result := query.Delete(&Pipeline{})
+	result := r.db.
+		Where("id = ?", id).
+		Where("EXISTS(?)", r.checkAccessQuery(r.db, scope)).
+		Unscoped().
+		Delete(&Pipeline{})
 
 	if result.Error != nil {
 		return result.Error
@@ -83,14 +79,8 @@ func (r *PipelineRepository) Delete(id string, scope *utils.AuthScope) error {
 func (r *PipelineRepository) FindForUpdate(tx *gorm.DB, id string, scope *utils.AuthScope, isFull bool) (*Pipeline, error) {
 	var pipeline Pipeline
 	query := tx.Clauses(&clause.Locking{Strength: "UPDATE"}).
-		Model(&Pipeline{}).
-		Joins("JOIN deals ON deals.id = pipelines.deal_id").
-		Where("pipelines.id = ?", id).
-		Where("deals.company_id = ?", scope.CompanyId)
-
-	if scope.ManagerId != nil {
-		query = query.Where("deals.manager_id = ?", *scope.ManagerId)
-	}
+		Where("id = ?", id).
+		Where("EXISTS(?)", r.checkAccessQuery(tx, scope))
 
 	if isFull {
 		query = query.Preload("Stages")
@@ -107,4 +97,16 @@ func (r *PipelineRepository) FindForUpdate(tx *gorm.DB, id string, scope *utils.
 	}
 
 	return &pipeline, nil
+}
+
+func (r *PipelineRepository) checkAccessQuery(tx *gorm.DB, scope *utils.AuthScope) *gorm.DB {
+	subQuery := tx.Table("deals").
+		Select("1").
+		Where("deals.id = pipelines.deal_id").
+		Where("deals.company_id = ?", scope.CompanyId)
+
+	if scope.ManagerId != nil {
+		subQuery = subQuery.Where("deals.manager_id = ?", *scope.ManagerId)
+	}
+	return subQuery
 }
