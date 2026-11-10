@@ -13,7 +13,13 @@ FROM alpine:3.22
 
 WORKDIR /app
 
+RUN apk --no-cache add ca-certificates
+
+RUN adduser -D -H appuser
+
 COPY --from=builder /app/server .
+
+USER appuser
 
 EXPOSE 8080
 

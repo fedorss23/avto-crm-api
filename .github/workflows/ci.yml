@@ -1,0 +1,121 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+jobs:
+    test:
+        name: Tests
+        runs-on: ubuntu-latest
+    
+        steps:
+          - uses: actions/checkout@v4
+
+          - uses: actions/setup-go@v4
+            with:
+                go-version: 1.26.3
+                cache: true
+
+          - run: go mod download
+
+          - name: Run tests
+            run: go test -cover ./...
+    
+    build:
+        name: Build
+        runs-on: ubuntu-latest
+
+        needs: [test]
+
+        steps:
+          - uses: actions/checkout@v4
+
+          - uses: actions/setup-go@v4
+            with:
+                go-version: 1.26.3
+                cache: true
+            
+          - run: go mod download
+
+          - name: Run tests
+            run: go build ./...
+    
+    image:
+        name: Push image
+        runs-on: ubuntu-latest
+        needs: [test, build]
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+        steps:
+          - uses: actions/checkout@v4
+
+          - name: Login to Dockerhub
+            env:
+                DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+                DOCKERHUB_NAME: ${{ secrets.DOCKERHUB_NAME }}
+            run: |
+                echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_NAME" --password-stdin
+            
+          - name: Push image
+            env:
+                DOCKERHUB_NAME: ${{ secrets.DOCKERHUB_NAME}}
+                IMAGE_TAG: ${{ github.sha }}
+            run: |
+                docker build -t "$DOCKERHUB_NAME/api:$IMAGE_TAG" .
+                docker push "$DOCKERHUB_NAME/api:$IMAGE_TAG"
+    
+    change-image:
+        name: Change image
+        runs-on: ubuntu-latest
+        needs: [test, build, image]
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+        concurrency:
+            group: avto-crm-infra-update
+            cancel-in-progress: false
+
+        steps:
+          - name: Checkout infra repo
+            uses: actions/checkout@v4
+            with:
+                repository: fedorss23/avto-crm-infra
+                ref: main
+                path: infra
+                ssh-key: ${{ secrets.DEPLOY_KEY }}
+                persist-credentials: false
+            
+          - uses: actions/checkout@v4
+        
+          - name: Update deployment image
+            working-directory: infra
+            env:
+                DOCKERHUB_NAME: ${{ secrets.DOCKERHUB_NAME }}
+                IMAGE_TAG: ${{ github.sha }}
+            run: |
+                sed -i "s|image: .*api:.*|image: $DOCKERHUB_NAME/api:$IMAGE_TAG|" apps/myapp/deployment.yaml
+
+          - name: Commit infra update
+            working-directory: infra
+            env:
+                IMAGE_TAG: ${{ github.sha }}
+            run: |
+                git config user.name "github-actions[bot]"
+                git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+                git add apps/myapp/deployment.yaml
+
+                if git diff --cached --quiet; then
+                    echo "No changes"
+                    exit 0
+                fi
+
+                git commit -m "deploy: update image to $IMAGE_TAG"
+
+                git remote set-url origin \
+                git@github.com:fedorss23/avto-crm-infra.git
+
+                git push origin HEAD:main
+            
