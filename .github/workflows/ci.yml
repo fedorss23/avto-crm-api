@@ -66,6 +66,12 @@ jobs:
             run: |
                 docker build -t "$DOCKERHUB_NAME/api:$IMAGE_TAG" .
                 docker push "$DOCKERHUB_NAME/api:$IMAGE_TAG"
+            
+          - name: Image name
+            env:
+                DOCKERHUB_NAME: ${{ secrets.DOCKERHUB_NAME}}
+                IMAGE_TAG: ${{ github.sha }}
+            run: echo "$DOCKERHUB_NAME/api:$IMAGE_TAG"
     
     change-image:
         name: Change image
