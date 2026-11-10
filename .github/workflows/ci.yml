@@ -84,7 +84,7 @@ jobs:
                 repository: fedorss23/avto-crm-infra
                 ref: main
                 path: infra
-                ssh-key: ${{ secrets.DEPLOY_KEY }}
+                ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
                 persist-credentials: false
             
           - uses: actions/checkout@v4
